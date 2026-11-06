@@ -413,6 +413,11 @@ function createRun(rid, flags, then) {
   const r = db.routines[rid];
   let nodes;
   try { nodes = expand(db.routines, rid, flags); } catch (e) { toast(e.message); return; }
+  if (!nodes.length) {
+    const why = r.steps.length ? `${r.name} has no steps with these options` : `${r.name} has no steps yet`;
+    toast(why, { label: 'Edit', fn: () => { location.hash = `#/edit/${r.id}`; } });
+    return;
+  }
   r.lastFlags = flags;
   const run = { id: uid(), routineId: rid, name: r.name, flags, nodes, done: {}, startedAt: Date.now() };
   addRun(run);
@@ -546,9 +551,8 @@ function itemDialog(it) {
       <span class="grow"></span><button class="danger" value="delete">Delete</button></div>`,
   (fd, v) => {
     if (v === 'delete') {
-      if (!confirm(`Delete “${it.title}”?`)) return;
-      db.backlog = db.backlog.filter((i) => i !== it);
-      persist(); render(); return;
+      undoable(`Deleted ${it.title}`, () => { db.backlog = db.backlog.filter((i) => i !== it); });
+      return;
     }
     it.title = (fd.get('title') || '').trim() || it.title;
     it.starred = fd.has('starred');
@@ -699,11 +703,15 @@ const actions = {
     settle(run);
   },
   skip(d) { db.runs[d.run].done[d.id] = 'skipped'; settle(db.runs[d.run]); },
+  // No confirm(): it is unreliable in home-screen apps on iOS, and Undo covers mistakes.
   abandon(d) {
     const run = db.runs[d.id];
-    if (!confirm(isTodo(run) ? `Delete “${run.name}” completely?` : 'Remove this run?')) return;
-    if (run.backlogId) db.backlog = db.backlog.filter((i) => i.id !== run.backlogId);
-    removeRun(d.id); persist(); leave('#/');
+    const verb = isTodo(run) || run.finishedAt ? 'Deleted' : 'Abandoned';
+    undoable(`${verb} ${run.name}`, () => {
+      if (run.backlogId) db.backlog = db.backlog.filter((i) => i.id !== run.backlogId);
+      removeRun(run.id);
+    });
+    leave('#/');
   },
   unpull(d) {
     const run = db.runs[d.id];

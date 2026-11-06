@@ -52,6 +52,10 @@ export function seed() {
 export function normalize(db) {
   db.prefs = { todayMode: 'mixed', ...(db.prefs || {}) };
   db.backlog = db.backlog || [];
+  // A run with no steps can't be ticked or finished; older versions could create one.
+  for (const [id, run] of Object.entries(db.runs)) {
+    if (!run.nodes?.length && !run.finishedAt) delete db.runs[id];
+  }
   return db;
 }
 
