@@ -40,6 +40,8 @@ Goal: a little happiness from checking things off, never guilt. Fits the "no fix
 - Animations are the core: make ticking itself satisfying (check animation, haptic tap) and celebrate a finished routine or day with something a bit bigger.
 - Gentle counts: steps done today, a week view. Rewards what happened; never shows what was missed.
 - Missions (maybe — an accidental idea worth keeping): occasional optional challenges ("finish Morning before 8 three times this week"). Ignoring one costs nothing.
+  - Missions can target a *category* rather than specific steps: "one mental-health thing a week" is met by any step carrying that badge, wherever it lives.
+- Categories: tag steps/routines (mental health, movement, social, admin…), each with a colour and small badge shown wherever the step appears (e.g. green for mental health). Useful on its own: Today shows at a glance if it's all admin and no green.
 - Earning vices: completed steps earn points that can be spent on self-chosen treats ("an episode", "dessert"). Allowing yourself things, explicitly.
 
 ## Open questions
