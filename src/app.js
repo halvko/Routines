@@ -116,7 +116,7 @@ function todayView() {
   const c = ctx();
   const mode = db.prefs.todayMode;
   const startChips = `<div class="chips start">${Object.values(db.routines).map((r) =>
-    `<button data-act="start" data-id="${r.id}">▶ ${esc(r.name)}</button>`).join('')}</div>`;
+    `<button data-act="start" data-id="${r.id}" data-kind="routine" data-noswipe="1">▶ ${esc(r.name)}</button>`).join('')}</div>`;
 
   if (!active.length) {
     return `<h1>Today</h1>
@@ -408,26 +408,29 @@ function addRun(run) {
   persist();
 }
 
-function createRun(rid, flags) {
+// then(run) runs after the run exists, e.g. to place it straight away
+function createRun(rid, flags, then) {
   const r = db.routines[rid];
   let nodes;
   try { nodes = expand(db.routines, rid, flags); } catch (e) { toast(e.message); return; }
   r.lastFlags = flags;
-  addRun({ id: uid(), routineId: rid, name: r.name, flags, nodes, done: {}, startedAt: Date.now() });
+  const run = { id: uid(), routineId: rid, name: r.name, flags, nodes, done: {}, startedAt: Date.now() };
+  addRun(run);
   toast(`Started ${r.name}`);
   if (route().view === 'today') render(); else location.hash = '#/';
+  then?.(run);
 }
 
-function startRoutine(rid) {
+function startRoutine(rid, then) {
   const flagNames = collectFlags(db.routines, rid);
-  if (!flagNames.length) return createRun(rid, {});
+  if (!flagNames.length) return createRun(rid, {}, then);
   const last = db.routines[rid].lastFlags || {};
   openDialog(`
     <h1>${esc(db.routines[rid].name)}</h1>
     <p class="muted">What's today like?</p>
     ${flagNames.map((f) => `<label class="flag"><input type="checkbox" name="${esc(f)}" ${last[f] ? 'checked' : ''}> ${esc(f)}</label>`).join('')}
     <div class="row end"><button type="button" data-close>Cancel</button><button class="primary" value="go">Start</button></div>`,
-  (fd) => createRun(rid, Object.fromEntries(flagNames.map((f) => [f, fd.has(f)]))));
+  (fd) => createRun(rid, Object.fromEntries(flagNames.map((f) => [f, fd.has(f)])), then));
 }
 
 // A run finishes by itself when its last step is resolved, and reopens if you undo one.
@@ -574,6 +577,7 @@ function routineUsers(id) {
 // What "swipe left" does for a row, and what it's called.
 function swipeFor(el) {
   const d = el.dataset;
+  if (d.noswipe) return null;
   if (d.kind === 'step') {
     const run = db.runs[d.run];
     return isTodo(run)
@@ -654,6 +658,7 @@ function holdActions(el) {
     const r = db.routines[d.id];
     return { title: r.name, list: [
       { label: 'Start', fn: () => startRoutine(r.id) },
+      { label: 'Start and place…', fn: () => startRoutine(r.id, (run) => actions.place({ id: run.id })) },
       { label: 'Open', fn: () => { location.hash = `#/routine/${r.id}`; } },
       { label: 'Edit', fn: () => { location.hash = `#/edit/${r.id}`; } },
       del,

@@ -132,7 +132,9 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 6px; }
 .sheet-btn { width: 100%; padding: 14px; font-size: 17px; border-radius: 12px; }
 .sheet-btn.danger { color: #dc2626; }
 .sheet-btn.cancel { margin-top: 6px; font-weight: 600; }
-#toast.has-action.show { pointer-events: auto; display: flex; align-items: center; gap: 14px; }
+/* layout must not depend on .show, or the toast jumps while fading out */
+#toast.has-action { display: flex; align-items: center; gap: 14px; }
+#toast.has-action.show { pointer-events: auto; }
 #toast button { background: none; border: 0; color: var(--accent); font-weight: 700; padding: 4px 2px; }
 @media (prefers-color-scheme: light) { #toast button { color: #a5b4fc; } }
 

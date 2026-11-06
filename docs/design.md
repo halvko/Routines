@@ -27,10 +27,22 @@ Living document of where Routines is heading. Decisions marked ✅ are built.
    - **Leftovers live here too:** unfinished carry-over items land in the backlog marked "from yesterday", badged until seen. One source of truth for "didn't get to it" and "will get to it". Dumped items never nag; new leftovers badge until reviewed.
 7. **Dropping is first-class.** ✅ Swipe left to delete/drop (with Undo); hold (or right-click) for every action on a row. Drop a single step or a whole run any time, ideally a swipe. Not a failure state.
 
+## Multi-day routines
+
+Some routines span days. Travel: check in online (usually before packing starts) days ahead, pack the evening before, lock up on the day.
+
+- A run can have an **anchor date** chosen when starting it ("departure: Friday").
+- Steps get an optional **timing relative to the anchor**: "2 days before", "the day before", "on the day". Default: no timing = available as soon as its prerequisites are done.
+- Until its day, a step shows as *Upcoming · Thu* rather than in Do now; on its day it appears in Today like anything else.
+- Timing and "after" combine: Pack waits on Check in **and** for the day before. Ordering stays the graph; dates only gate.
+- Once Day runs exist (slice 3), a timed step lands in that day's run (e.g. after *Back home* the evening before) — routines all the way down.
+- The run itself already persists across days; what's new is gating steps by date.
+
 ## Later
 
 - Rewrite in TypeScript once the shape has settled. Plain JS (no build step) is deliberate for now, to keep experimenting cheap.
 - Backend + login so it can be edited from a computer (phone stays the main entry point).
+- **MCP server** on that backend, so Claude can be connected as an integration and manipulate tasks directly: read Today, add to the backlog, tick/drop steps, start and place routines, draft/edit routines. Needs the backend (data must live somewhere Claude can reach) and auth. Same tool surface the AI drafting feature would use.
 - AI drafting: "I need to do X" → suggested routine you then edit. Needs the backend to keep the API key off the phone.
 - Companion runs: a flag spawns linked routines already attached (starting Morning with `gym` also spawns Pack gym bag + After gym).
 - Day templating by weekday (weekend flag set automatically, etc.).
