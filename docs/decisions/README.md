@@ -18,4 +18,4 @@ must have backups and an export path, whatever else we try.
 | [0002](0002-core-interface.md) | The core is one synchronous `update(event)`, fed through one queue | Accepted |
 | [0003](0003-sync.md) | Hand-rolled sync: an outbox on the device, one ordered log per user on the server | Accepted |
 | [0004](0004-auth.md) | Passkeys first, Argon2id password fallback, opaque session cookies | Accepted |
-| 0005 | Where the server runs | Open: researching Rust hosting |
+| [0005](0005-hosting.md) | Cloudflare Workers in Rust, one Durable Object per user, Paid plan | Accepted, to be confirmed by a prototype |
