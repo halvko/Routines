@@ -1,0 +1,57 @@
+:root {
+  --bg: #f6f6f9; --card: #fff; --text: #1b1b24; --muted: #6b6b7b; --line: #e3e3ec;
+  --accent: #4f46e5; --accent-text: #fff; --ok: #16a34a; --warn: #b45309; --chip: #eef0ff;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14141a; --card: #1e1e27; --text: #ececf3; --muted: #9a9aad; --line: #2e2e3a;
+    --accent: #818cf8; --accent-text: #11111a; --ok: #4ade80; --warn: #fbbf24; --chip: #2a2a4a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; }
+.top { padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--card); }
+.brand { color: var(--text); font-weight: 700; text-decoration: none; font-size: 18px; }
+main { max-width: 640px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 24px; margin: 4px 0 12px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 24px 0 8px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.grow { flex: 1; min-width: 0; }
+.muted { color: var(--muted); font-size: 14px; }
+a { color: var(--accent); }
+button, .btn { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text);
+  border-radius: 10px; padding: 8px 14px; cursor: pointer; text-decoration: none; display: inline-block; }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+button.ghost { border-color: transparent; background: transparent; color: var(--muted); padding: 8px; }
+button.danger { color: #dc2626; }
+input[type=text], select { font: inherit; width: 100%; padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--bg); color: var(--text); }
+.bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+.bar > i { display: block; height: 100%; background: var(--accent); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.tag { background: var(--chip); border-radius: 99px; padding: 2px 10px; font-size: 13px; }
+
+/* run */
+.step { display: flex; align-items: center; gap: 12px; padding: 14px; }
+.check { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--accent); background: transparent;
+  flex: none; padding: 0; display: grid; place-items: center; font-size: 18px; color: var(--accent-text); }
+.done .check { background: var(--ok); border-color: var(--ok); }
+.skipped .check { background: var(--muted); border-color: var(--muted); }
+.done .label, .skipped .label { text-decoration: line-through; color: var(--muted); }
+.blocked { opacity: .65; }
+.blocked .check { border-color: var(--line); cursor: default; }
+.banner { background: var(--ok); color: #fff; border-radius: 12px; padding: 16px; text-align: center; font-weight: 600; margin: 12px 0; }
+
+/* editor */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.chip { padding: 3px 10px; font-size: 13px; border-radius: 99px; background: transparent; color: var(--muted); }
+.chip.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.badge { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; }
+label.small { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; color: var(--muted); }
+label.small input { flex: 1; }
+.flag { display: flex; gap: 12px; align-items: center; padding: 12px 0; font-size: 17px; }
+.flag input { width: 22px; height: 22px; }
+dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text); width: min(92vw, 420px); }
+dialog::backdrop { background: #0008; }
+#toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+  padding: 10px 16px; border-radius: 10px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+#toast.show { opacity: 1; }
