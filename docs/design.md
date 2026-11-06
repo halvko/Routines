@@ -23,7 +23,9 @@ Living document of where Routines is heading. Decisions marked ✅ are built.
    - One-off steps added to a day carry over.
    - Sub-routine steps follow the routine they came from (Morning lapses, a "Pay bills" inside it carries over). Revisit if wrong in practice.
    - Morning/Breakfast-type routines: lapse. Per-step override only if missed in practice.
-6. **Dropping is first-class.** Drop a single step or a whole run any time, ideally a swipe. Not a failure state.
+6. **Backlog (plain to-do).** Somewhere to dump things with no plan: single items, no date, no stage. Instant capture via a `+` reachable from anywhere. Optional priority, set later (start with a star; maybe now-ish / normal / someday). Pull an item into Today, a stage, or a future day — same action as for leftovers. An item can grow into a routine (natural place for AI: "plan Anna's birthday" → suggested steps).
+   - **Leftovers live here too:** unfinished carry-over items land in the backlog marked "from yesterday", badged until seen. One source of truth for "didn't get to it" and "will get to it". Dumped items never nag; new leftovers badge until reviewed.
+7. **Dropping is first-class.** Drop a single step or a whole run any time, ideally a swipe. Not a failure state.
 
 ## Later
 
