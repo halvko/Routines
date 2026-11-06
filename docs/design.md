@@ -39,6 +39,7 @@ Goal: a little happiness from checking things off, never guilt. Fits the "no fix
 
 - Animations are the core: make ticking itself satisfying (check animation, haptic tap) and celebrate a finished routine or day with something a bit bigger.
 - Gentle counts: steps done today, a week view. Rewards what happened; never shows what was missed.
+- Missions (maybe — an accidental idea worth keeping): occasional optional challenges ("finish Morning before 8 three times this week"). Ignoring one costs nothing.
 - Earning vices: completed steps earn points that can be spent on self-chosen treats ("an episode", "dessert"). Allowing yourself things, explicitly.
 
 ## Open questions
