@@ -12,7 +12,7 @@ const persist = () => save(db);
 // action = { label, fn } adds a button (e.g. Undo) and keeps the toast up a little longer
 function toast(msg, action) {
   const el = document.getElementById('toast');
-  el.textContent = msg;
+  el.replaceChildren(Object.assign(document.createElement('span'), { className: 'msg', textContent: msg }));
   if (action) {
     const btn = document.createElement('button');
     btn.textContent = action.label;
@@ -551,7 +551,7 @@ function itemDialog(it) {
       <span class="grow"></span><button class="danger" value="delete">Delete</button></div>`,
   (fd, v) => {
     if (v === 'delete') {
-      undoable(`Deleted ${it.title}`, () => { db.backlog = db.backlog.filter((i) => i !== it); });
+      undoable(`Deleted “${it.title}”`, () => { db.backlog = db.backlog.filter((i) => i !== it); });
       return;
     }
     it.title = (fd.get('title') || '').trim() || it.title;
@@ -586,24 +586,24 @@ function swipeFor(el) {
     const run = db.runs[d.run];
     return isTodo(run)
       ? { label: 'Delete', fn: () => deleteTodoRun(run) }
-      : { label: 'Drop', fn: () => undoable(`Dropped ${run.nodes.find((n) => n.id === d.id)?.title}`, () => { run.done[d.id] = 'skipped'; settleQuiet(run); }) };
+      : { label: 'Drop', fn: () => undoable(`Dropped “${run.nodes.find((n) => n.id === d.id)?.title}”`, () => { run.done[d.id] = 'skipped'; settleQuiet(run); }) };
   }
-  if (d.kind === 'item') return { label: 'Delete', fn: () => { const it = item(d.id); undoable(`Deleted ${it.title}`, () => { db.backlog = db.backlog.filter((i) => i !== it); }); } };
+  if (d.kind === 'item') return { label: 'Delete', fn: () => { const it = item(d.id); undoable(`Deleted “${it.title}”`, () => { db.backlog = db.backlog.filter((i) => i !== it); }); } };
   if (d.kind === 'run') {
     const run = db.runs[d.id];
     return isTodo(run)
       ? { label: 'Delete', fn: () => deleteTodoRun(run) }
-      : { label: 'Abandon', fn: () => undoable(`Abandoned ${run.name}`, () => removeRun(run.id)) };
+      : { label: 'Abandon', fn: () => undoable(`Abandoned “${run.name}”`, () => removeRun(run.id)) };
   }
   if (d.kind === 'routine') {
     const r = db.routines[d.id];
-    return { label: 'Delete', fn: () => { if (!routineUsers(r.id)) undoable(`Deleted ${r.name}`, () => { delete db.routines[r.id]; }); } };
+    return { label: 'Delete', fn: () => { if (!routineUsers(r.id)) undoable(`Deleted “${r.name}”`, () => { delete db.routines[r.id]; }); } };
   }
   return null;
 }
 
 function deleteTodoRun(run) {
-  undoable(`Deleted ${run.name}`, () => {
+  undoable(`Deleted “${run.name}”`, () => {
     if (run.backlogId) db.backlog = db.backlog.filter((i) => i.id !== run.backlogId);
     removeRun(run.id);
   });
@@ -707,7 +707,7 @@ const actions = {
   abandon(d) {
     const run = db.runs[d.id];
     const verb = isTodo(run) || run.finishedAt ? 'Deleted' : 'Abandoned';
-    undoable(`${verb} ${run.name}`, () => {
+    undoable(`${verb} “${run.name}”`, () => {
       if (run.backlogId) db.backlog = db.backlog.filter((i) => i.id !== run.backlogId);
       removeRun(run.id);
     });
@@ -752,7 +752,7 @@ const actions = {
     const r = routineOf();
     if (routineUsers(r.id)) return;
     location.hash = '#/routines';
-    undoable(`Deleted ${r.name}`, () => { delete db.routines[r.id]; });
+    undoable(`Deleted “${r.name}”`, () => { delete db.routines[r.id]; });
   },
   addStep() {
     const r = routineOf();

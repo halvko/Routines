@@ -56,9 +56,6 @@ label.small input { flex: 1; }
 .flag input { width: 22px; height: 22px; }
 dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text); width: min(92vw, 420px); }
 dialog::backdrop { background: #0008; }
-#toast { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
-  padding: 10px 16px; border-radius: 10px; opacity: 0; pointer-events: none; transition: opacity .2s; }
-#toast.show { opacity: 1; }
 
 /* today */
 .head { margin-bottom: 4px; }
@@ -83,7 +80,6 @@ details.coming[open] summary h2::after { content: ' ▾'; }
 .fab { position: fixed; right: calc(20px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom));
   width: 56px; height: 56px; border-radius: 50%; padding: 0; font-size: 30px; line-height: 1;
   background: var(--accent); color: var(--accent-text); border: 0; box-shadow: 0 4px 14px #0004; z-index: 6; }
-#toast { bottom: calc(88px + env(safe-area-inset-bottom)); z-index: 7; }
 .capture { margin-bottom: 8px; }
 .capture input { flex: 1; }
 .linkish { border: 0; background: none; padding: 0; text-align: left; color: inherit; font: inherit; }
@@ -133,13 +129,23 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 6px; }
 .sheet-btn.danger { color: #dc2626; }
 .sheet-btn.cancel { margin-top: 6px; font-weight: 600; }
 /* layout must not depend on .show, or the toast jumps while fading out */
-#toast.has-action { display: flex; align-items: center; gap: 14px; }
-#toast.has-action.show { pointer-events: auto; }
-#toast button { background: none; border: 0; color: var(--accent); font-weight: 700; padding: 4px 2px; }
-@media (prefers-color-scheme: light) { #toast button { color: #a5b4fc; } }
 
 /* focus mode: a run / routine / editor gets the whole screen */
 body.focus .top { display: none; }
 body.focus main { padding-top: calc(12px + env(safe-area-inset-top)); }
 body.focus .fab { display: none; }
 button.back { font-size: 16px; color: var(--accent); padding: 6px 0; margin-bottom: 2px; }
+
+/* toast: sized to its text (up to a max), not to half the screen */
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(88px + env(safe-area-inset-bottom)); z-index: 7;
+  width: max-content; max-width: min(calc(100vw - 32px), 440px); box-sizing: border-box;
+  display: flex; align-items: center; gap: 18px; padding: 12px 18px; border-radius: 12px;
+  background: #1f1f2a; color: #f4f4f8; box-shadow: 0 6px 20px #0003;
+  opacity: 0; pointer-events: none; transition: opacity .2s; }
+#toast.show { opacity: 1; }
+#toast.has-action.show { pointer-events: auto; }
+#toast .msg { flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+#toast button { flex: none; background: none; border: 0; color: #a5b4fc; font-weight: 700; padding: 6px 2px; margin: -6px 0; }
+@media (prefers-color-scheme: dark) {
+  #toast { background: #34344a; border: 1px solid #45455e; box-shadow: 0 6px 24px #0008; }
+}
