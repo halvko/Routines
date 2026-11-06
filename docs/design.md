@@ -33,6 +33,15 @@ Living document of where Routines is heading. Decisions marked ✅ are built.
 - Companion runs: a flag spawns linked routines already attached (starting Morning with `gym` also spawns Pack gym bag + After gym).
 - Day templating by weekday (weekend flag set automatically, etc.).
 
+## Gamification (later, start without)
+
+Goal: a little happiness from checking things off, never guilt. Fits the "no fixed cadence" philosophy, so no streaks that punish a missed day.
+
+- Make ticking itself satisfying first: animation, haptic tap, a small celebration when a routine or the day completes.
+- Gentle counts: steps done today, a week view. Rewards what happened; never shows what was missed.
+- Earning vices: completed steps earn points that can be spent on self-chosen treats ("an episode", "dessert"). Allowing yourself things, explicitly.
+- Missions: an occasional optional challenge ("finish Morning before 8 three times this week").
+
 ## Open questions
 
 - Does a new day spawn automatically on first open, or via a "Start day" tap?
