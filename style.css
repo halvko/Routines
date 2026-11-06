@@ -8,9 +8,10 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; }
-.top { padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--card); }
+.top { padding: calc(14px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 14px calc(16px + env(safe-area-inset-left)); border-bottom: 1px solid var(--line); background: var(--card); }
 .brand { color: var(--text); font-weight: 700; text-decoration: none; font-size: 18px; }
-main { max-width: 640px; margin: 0 auto; padding: 16px; }
+main { max-width: 640px; margin: 0 auto; padding: 16px calc(16px + env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left)); }
+body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
 h1 { font-size: 24px; margin: 4px 0 12px; }
 h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 24px 0 8px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
@@ -52,6 +53,6 @@ label.small input { flex: 1; }
 .flag input { width: 22px; height: 22px; }
 dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text); width: min(92vw, 420px); }
 dialog::backdrop { background: #0008; }
-#toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+#toast { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
   padding: 10px 16px; border-radius: 10px; opacity: 0; pointer-events: none; transition: opacity .2s; }
 #toast.show { opacity: 1; }

@@ -296,3 +296,7 @@ document.getElementById('file').addEventListener('change', async (e) => {
 });
 
 render();
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+// Ask the browser not to evict our localStorage under storage pressure.
+navigator.storage?.persist?.().catch(() => {});
