@@ -1,0 +1,609 @@
+# Claude reviewers on pull requests: one job per role file in .github/reviewers/.
+name: Review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize, labeled]
+
+env:
+  # Once this many rounds have run, pushes no longer start one; the `review`
+  # label still does, and starts a fresh budget.
+  MAX_ROUNDS: 5
+
+# One round per PR at a time. A round in progress finishes, so every reviewer
+# gets into the summary; a newer event waits, replacing any older one waiting.
+# Other labels get a group of their own, so they never wait or replace.
+concurrency:
+  group: >-
+    review-${{ github.event.pull_request.number }}${{
+    github.event.action == 'labeled' && github.event.label.name != 'review'
+    && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: false
+
+jobs:
+  roles:
+    # Drafts are skipped; the `review` label asks for a fresh round on demand.
+    if: >-
+      !github.event.pull_request.draft &&
+      (github.event.action != 'labeled' || github.event.label.name == 'review')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      roles: ${{ steps.list.outputs.roles }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # claude-code-action skips without failing when this workflow differs
+      # from the default branch's copy. A stale base fails the run instead; a
+      # PR that edits the workflow gets a warning and no round.
+      - id: current
+        env:
+          DEFAULT: ${{ github.event.repository.default_branch }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          . .github/scripts/review-seen.sh
+          git cat-file -e "origin/$DEFAULT^{commit}"
+          git cat-file -e "$HEAD_SHA^{commit}"
+          case $(workflow_verdict "origin/$DEFAULT" HEAD) in
+            stale)
+              echo "::error file=$review_workflow::This run's copy of the review workflow is older than $DEFAULT's, so the reviewers would not run. Rebase the PR onto $DEFAULT and push to get a review."
+              exit 1 ;;
+            edited)
+              echo "::warning file=$review_workflow::This PR or its base edits the review workflow, which the reviewers can only run once it is on $DEFAULT."
+              echo "skip=true" >> "$GITHUB_OUTPUT" ;;
+          esac
+      # Opening the PR, marking it ready and the `review` label always start a
+      # round; pushes and reopening are gated. The summary comment carries a
+      # marker per reviewer and round, naming the head it reviewed and what
+      # started it.
+      - id: gate
+        if: >-
+          steps.current.outputs.skip != 'true' &&
+          github.event.action != 'opened' && github.event.action != 'labeled' &&
+          github.event.action != 'ready_for_review' &&
+          !contains(github.event.pull_request.labels.*.name, 'review')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AFTER: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          . .github/scripts/review-seen.sh
+          markers=$(review_markers "$REPO" "$PR")
+          # A labelled round starts a fresh budget for every reviewer, including
+          # one that wrote no summary in it, and counts as its first round.
+          rounds=$(printf '%s\n' "$markers" | awk '
+            NF && $5 == "label" { if (prev != "label " $4) delete n; n[$3] = 1 }
+            NF && $5 == "auto" { n[$3]++ }
+            NF { prev = $5 " " $4 }
+            END { m = 0; for (r in n) if (n[r] > m) m = n[r]; print m }')
+          # A change that keeps the patch last reviewed (a rebase) gets no round.
+          reviewed=$(printf '%s\n' "$markers" | last_reviewed)
+          if [ -n "$reviewed" ] \
+            && git fetch -q origin "$reviewed" "$AFTER" "$BASE_REF" 2>/dev/null \
+            && same_patch "origin/$BASE_REF" "$reviewed" "$AFTER"; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$rounds" -ge "$MAX_ROUNDS" ]; then
+            # A reviewer whose latest round raised findings still reviews the
+            # change that answers them.
+            again=$(printf '%s\n' "$markers" | awk 'NF { last[$3] = $6 }
+              END { for (r in last) if (last[r] == "findings") print r }' \
+              | sort | jq -Rnc '[inputs]')
+            if [ "$again" != "[]" ]; then
+              echo "only=$again" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            # The notice goes into the summary comment, once per budget: the
+            # next round rewrites that comment without it.
+            summary=$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
+              --jq '.[] | select(.user.type == "Bot" and (.body | startswith("<!-- review-summary -->"))) | .id' \
+              | tail -n1)
+            body=""
+            [ -n "$summary" ] && body=$(gh api "repos/$REPO/issues/comments/$summary" --jq .body)
+            case "$body" in *"<!-- review-cap -->"*) exit 0 ;; esac
+            file=$(mktemp)
+            {
+              printf '%s\n' "${body:-<!-- review-summary -->}"
+              echo
+              echo "<!-- review-cap -->"
+              echo "**The reviewers have had $rounds rounds on this PR, so changes no longer start a new one. This needs a human look; add the \`review\` label to ask for another round.**"
+            } > "$file"
+            if [ -n "$summary" ]; then
+              gh api -X PATCH "repos/$REPO/issues/comments/$summary" -F body=@"$file" > /dev/null
+            else
+              gh pr comment "$PR" --repo "$REPO" --body-file "$file"
+            fi || echo "could not post the cap notice"
+          fi
+      - id: list
+        if: steps.current.outputs.skip != 'true' && steps.gate.outputs.skip != 'true'
+        env:
+          ONLY: ${{ steps.gate.outputs.only }}
+        run: |
+          roles=$(find .github/reviewers -maxdepth 1 -name '*.md' ! -name README.md \
+            -printf '%f\n' | sed 's/\.md$//' | sort | jq -Rnc '[inputs]')
+          if [ -n "$ONLY" ]; then
+            roles=$(jq -c --argjson only "$ONLY" 'map(select(IN($only[])))' <<< "$roles")
+          fi
+          echo "roles=$roles" >> "$GITHUB_OUTPUT"
+
+  review:
+    needs: roles
+    if: needs.roles.outputs.roles != '' && needs.roles.outputs.roles != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        role: ${{ fromJSON(needs.roles.outputs.roles) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # A brief may open with a `---` front matter block holding `model: <name>`
+      # and `screenshots: true`.
+      - id: brief
+        env:
+          ROLE: ${{ matrix.role }}
+        run: |
+          file=".github/reviewers/$ROLE.md"
+          if [ "$(head -n1 "$file")" = "---" ]; then
+            front=$(awk 'NR > 1 && /^---$/ { exit } NR > 1' "$file")
+            body=$(awk 'f; NR > 1 && /^---$/ { f = 1 }' "$file")
+          else
+            front=""
+            body=$(cat "$file")
+          fi
+          model=$(printf '%s\n' "$front" | sed -n 's/^model:[[:space:]]*//p')
+          shots=$(printf '%s\n' "$front" | sed -n 's/^screenshots:[[:space:]]*//p')
+          {
+            echo "model_arg=${model:+--model $model}"
+            echo "screenshots=$shots"
+            delim="BRIEF_$(openssl rand -hex 16)"
+            echo "text<<$delim"
+            printf '%s\n' "$body"
+            echo "$delim"
+          } >> "$GITHUB_OUTPUT"
+      # A reviewer that has a round marker is in a later round, and only then
+      # gets told how to judge one.
+      - id: prior
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          ROLE: ${{ matrix.role }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          . .github/scripts/review-seen.sh
+          markers=$(review_markers "$REPO" "$PR")
+          last=$(printf '%s\n' "$markers" | awk -v r="$ROLE" '$3 == r' | last_reviewed)
+          [ -n "$last" ] || exit 0
+          # A rebase or force-push can leave the reviewed commit on no branch.
+          since=""
+          if git cat-file -e "$last^{commit}" 2>/dev/null \
+            || git fetch -q origin "$last" 2>/dev/null; then
+            old=$(git merge-base "$BASE" "$last")
+            new=$(git merge-base "$BASE" "$HEAD")
+            if [ "$last" = "$HEAD" ]; then
+              since="That is this head, so nothing has changed since."
+            elif [ "$old" = "$new" ]; then
+              since="\`git diff $last $HEAD\` shows what changed since."
+            else
+              since="The PR was rebased since, so \`git range-diff $old..$last $new..$HEAD\` shows what changed, commit by commit."
+            fi
+          fi
+          delim="LATER_$(openssl rand -hex 16)"
+          {
+            echo "text<<$delim"
+            echo "You have reviewed this PR before, at $last, so this is a later round. $since"
+            echo "Do both: check whether each of your earlier findings was fixed, and review"
+            echo "what changed since then for new problems, including ones the fixes brought."
+            echo "Judge a fix by the head's code: a commit named in a reply may since have"
+            echo "been squashed into another, so its absence from \`git log\` says nothing."
+            echo "A reply saying a fix is not pushed may predate the push, and a fix pushed"
+            echo "before your last round is not in the diff since: before saying a fix is"
+            echo "missing, quote the line at HEAD that still has the problem."
+            echo "Where a fix falls short, reply in that thread rather than opening a new"
+            echo "one. Where someone declined a finding with a reason, that settles it;"
+            echo "reply only if the reason is wrong about the code, and do not mark it"
+            echo "open. On code that has not changed, raise only real defects, not points"
+            echo "an earlier round could have raised, and never post a finding you already"
+            echo "posted again. If nothing new reaches that bar, say \"No new findings\" in"
+            echo "one line."
+            echo "$delim"
+          } >> "$GITHUB_OUTPUT"
+      # The reviewer's own inline threads in full, and a line for each other
+      # thread, whose full text it can read from review-threads/ if it needs it.
+      - id: threads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          ROLE: ${{ matrix.role }}
+        run: |
+          rm -rf review-threads && mkdir review-threads
+          gh api --paginate "repos/$REPO/pulls/$PR/comments" \
+            --jq '.[] | {id, in_reply_to_id, user: .user.login, path, line, original_line, body}' \
+            | jq -cs --arg role "$ROLE" 'group_by(.in_reply_to_id // .id)[]
+              | sort_by(.id) | .[0] as $root
+              | {id: $root.id, own: ($root.body | startswith("**\($role):**")),
+                 where: ($root.path + (if $root.line then ":\($root.line)"
+                   elif $root.original_line then ":\($root.original_line) (outdated)"
+                   else " (file)" end)),
+                 opener: ($root.body | capture("^\\*\\*(?<r>[a-z-]+):\\*\\*").r // $root.user),
+                 first: ($root.body | sub("^(\\*\\*[a-z-]+:\\*\\* *)+"; "") | split("\n")[0] | .[:120]),
+                 replies: (length - 1),
+                 text: (map("- \(.user) (\(.id)): "
+                   + (.body | sub("\n+---\n_Generated by [^\n]*\\s*$"; ""))) | join("\n"))}' \
+            > "$RUNNER_TEMP/threads.jsonl"
+          own="" others=""
+          while read -r t; do
+            id=$(jq -r .id <<< "$t")
+            head="Thread $id on $(jq -r .where <<< "$t")"
+            printf '%s\n%s\n' "$head" "$(jq -r .text <<< "$t")" > "review-threads/$id.md"
+            if [ "$(jq -r .own <<< "$t")" = true ]; then
+              own+="$(cat "review-threads/$id.md")"$'\n'
+            else
+              others+="$(jq -r '"- review-threads/\(.id).md, \(.where), by \(.opener), \(.replies) \(if .replies == 1 then "reply" else "replies" end): \(.first)"' <<< "$t")"$'\n'
+            fi
+          done < "$RUNNER_TEMP/threads.jsonl"
+          delim="THREADS_$(openssl rand -hex 16)"
+          {
+            echo "text<<$delim"
+            echo "Your inline threads, each with every reply in it, oldest first:"
+            echo
+            printf '%s\n' "${own:-None yet.}"
+            echo
+            echo "Other inline threads, one line each; read one with the Read tool when"
+            echo "it bears on a line you would comment on:"
+            echo
+            printf '%s\n' "${others:-None yet.}"
+            echo "$delim"
+          } >> "$GITHUB_OUTPUT"
+      # A reviewer that judges how the app looks gets pictures of it: every
+      # main screen at phone size, light and dark, at this head and at the
+      # base, both captured by the head's test/visual specs.
+      - if: steps.brief.outputs.screenshots == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - id: shots
+        if: steps.brief.outputs.screenshots == 'true'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          SHOTS_DIR=screenshots/head npm run screenshots || echo "some head screens could not be captured"
+          git worktree add -q "$RUNNER_TEMP/base" "$BASE"
+          APP_DIR="$RUNNER_TEMP/base" SHOTS_DIR=screenshots/base npm run screenshots \
+            || echo "some base screens could not be captured (new screens, or the base differs)"
+          delim="SHOTS_$(openssl rand -hex 16)"
+          {
+            echo "text<<$delim"
+            echo "Screenshots of the app are in screenshots/head/ (this PR) and screenshots/base/"
+            echo "(before it), one PNG per screen and colour scheme, named <screen>-<light|dark>.png,"
+            echo "at phone size (390x844 CSS px, 2x). Look at them with the Read tool; compare head"
+            echo "with base for the screens this PR touches. A screen missing from base is new or"
+            echo "could not be shown before. Captured screens:"
+            ls screenshots/head | sed 's/^/- /'
+            echo "$delim"
+          } >> "$GITHUB_OUTPUT"
+      # Files checked into the PR are not the reviewer's output.
+      - run: rm -f review-findings.json review-summary.md
+      - id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+            BASE: ${{ github.event.pull_request.base.sha }}
+            HEAD: ${{ github.event.pull_request.head.sha }}
+
+            You are the "${{ matrix.role }}" reviewer for this pull request. Other
+            reviewers cover other concerns in parallel; stay inside your brief
+            below and leave everything else to them.
+
+            Read the diff (`gh pr diff`), the PR description and commit messages
+            (`gh pr view`), and as much surrounding code as you need to judge it.
+            Read files with the Read, Grep and Glob tools. The only commands you
+            can run are `gh pr diff`, `gh pr view`, `git log`, `git show`,
+            `git diff` and `git range-diff`, one per Bash
+            call, with no `cd`, `;`, pipes or redirects; anything else is
+            refused.
+            Report only findings you can point at a line for and would defend to
+            the author. No praise, no restating the diff, no style nits your brief
+            does not ask for. If you find nothing, say so in one line.
+
+            Before judging, read the discussion the PR already has: comments and
+            reviews (`gh pr view --comments`) and the inline review threads
+            below. A point the author or a maintainer has already settled in a
+            reply there (asked for, accepted, or declined with a reason) is not
+            a finding, unless the code has changed since in a way that reopens
+            it. Do not repeat a finding an earlier review round already posted;
+            if it is still unaddressed, reply in its thread saying what is
+            still wrong, with no new inline comment, and mark the reply open:
+            that reopens the thread so the PR cannot merge over it.
+
+            ${{ steps.threads.outputs.text }}
+
+            ${{ steps.prior.outputs.text }}
+
+            ${{ steps.shots.outputs.text }}
+
+            Do not post anything yourself; once every reviewer is done, the
+            workflow posts all findings as one review and all summaries as one
+            comment. Always write both of these files with the Write tool, in
+            the current directory, even when you find nothing or a command is
+            refused:
+
+            - `review-findings.json`: a JSON array with one object per new
+              finding, `{"path": "<repo-relative file>", "line": <line in the
+              head version, on a line the diff shows>, "body": "<the finding>"}`,
+              and one per reply in an existing thread, `{"reply_to": <id of the
+              comment you answer>, "body": "<your reply>", "open": true}`, with
+              `"open": true` only when your finding there is still unaddressed
+              or its fix falls short, or `[]` if there are none.
+            - `review-summary.md`: the findings in a sentence each, then any
+              earlier findings still open, or one line saying there are none.
+              No heading; the workflow adds one.
+
+            Your brief:
+
+            ${{ steps.brief.outputs.text }}
+          claude_args: |
+            ${{ steps.brief.outputs.model_arg }}
+            --allowedTools "Edit(./review-findings.json),Write(./review-findings.json),Edit(./review-summary.md),Write(./review-summary.md),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(git range-diff:*)"
+
+      # The action hides the reviewer's output; its refused tool calls are
+      # what to look at when a reviewer writes no summary.
+      - id: check
+        if: always() && steps.claude.outcome != 'skipped'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          out="$RUNNER_TEMP/claude-execution-output.json"
+          [ -f "$out" ] && jq -r '.. | .permission_denials? // empty | .[]
+            | "refused: \(.tool_name) \(.tool_input | tostring | .[:300])"' "$out" || true
+          cp "$out" review-log.json 2>/dev/null || true
+          problems=$(.github/scripts/review-check.sh)
+          [ -n "$problems" ] || exit 0
+          printf '%s\n' "$problems"
+          delim="PROBLEMS_$(openssl rand -hex 16)"
+          printf 'text<<%s\n%s\n%s\n' "$delim" "$problems" "$delim" >> "$GITHUB_OUTPUT"
+      # A reviewer whose files are missing or would not post gets one more
+      # turn in the same session, told what is wrong.
+      - id: retry
+        if: always() && steps.check.outputs.text != '' && steps.claude.outputs.session_id != ''
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            The workflow checked your output files and cannot post them yet:
+
+            ${{ steps.check.outputs.text }}
+
+            Fix this by writing both files again with the Write tool. A finding
+            on a line the diff does not show can move to a line it does show,
+            or go in your summary instead.
+          claude_args: |
+            ${{ steps.brief.outputs.model_arg }}
+            --resume ${{ steps.claude.outputs.session_id }}
+            --allowedTools "Edit(./review-findings.json),Write(./review-findings.json),Edit(./review-summary.md),Write(./review-summary.md),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(git range-diff:*)"
+      - if: always() && steps.retry.outcome != 'skipped'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          out="$RUNNER_TEMP/claude-execution-output.json"
+          [ -f "$out" ] && jq -r '.. | .permission_denials? // empty | .[]
+            | "refused: \(.tool_name) \(.tool_input | tostring | .[:300])"' "$out" || true
+          cp "$out" review-log-retry.json 2>/dev/null || true
+          .github/scripts/review-check.sh
+      # The reviewer's full transcript, to see how it read the PR.
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-log-${{ matrix.role }}
+          path: |
+            review-log.json
+            review-log-retry.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: review-summary-${{ matrix.role }}
+          path: |
+            review-findings.json
+            review-summary.md
+          if-no-files-found: ignore
+
+  # Keeps one summary comment per PR, rewritten each round, then posts every
+  # reviewer's findings as one review, so someone watching the PR sees the
+  # whole round at once. A reviewer gets a marker only if it wrote a summary.
+  summary:
+    needs: [roles, review]
+    if: always() && needs.roles.result == 'success' && needs.review.result != 'skipped'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: review-summary-*
+          path: summaries
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          ROLES: ${{ needs.roles.outputs.roles }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          # Marking the PR ready starts a fresh budget, as the label does: rounds
+          # spent while it was not ready (stacked on another PR, say) reviewed
+          # a different change.
+          TRIGGER: >-
+            ${{ (contains(github.event.pull_request.labels.*.name, 'review')
+            || github.event.action == 'ready_for_review') && 'label' || 'auto' }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          summary=$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
+            --jq '.[] | select(.user.type == "Bot" and (.body | startswith("<!-- review-summary -->"))) | .id' \
+            | tail -n1)
+          old=""
+          [ -n "$summary" ] && old=$(gh api "repos/$REPO/issues/comments/$summary" --jq .body)
+          file=$(mktemp)
+          {
+            echo "<!-- review-summary -->"
+            # Re-running failed jobs reruns this one with the earlier
+            # summaries too, so a marker already written is not counted twice.
+            {
+              printf '%s\n' "$old" | { grep -E '^<!-- review-round: ' || true; }
+              for role in $(jq -r '.[]' <<< "$ROLES"); do
+                d="summaries/review-summary-$role"
+                if [ -s "$d/review-summary.md" ]; then
+                  # A round with new findings is marked, so the gate can let a
+                  # reviewer check their fix past the cap.
+                  found=$(jq -r 'if [.[]? | objects | select(has("path"))] | length > 0
+                    then " findings" else "" end' "$d/review-findings.json" 2>/dev/null || true)
+                  echo "<!-- review-round: $role $SHA $TRIGGER$found -->"
+                fi
+              done
+            } | awk '!seen[$0]++'
+            echo
+            echo "## Review of ${SHA:0:7}"
+            for role in $(jq -r '.[]' <<< "$ROLES"); do
+              echo
+              echo "### $role"
+              echo
+              f="summaries/review-summary-$role/review-summary.md"
+              if [ -s "$f" ]; then
+                # Reviewer text cannot open an HTML comment, so it cannot fake
+                # a marker or the cap notice, or hide the rest of the comment.
+                sed 's/<!--/\&lt;!--/g' "$f"
+              else
+                echo "No summary; see [the run]($RUN)."
+              fi
+            done
+          } > "$file"
+          if [ -n "$summary" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$summary" -F body=@"$file" > /dev/null
+          else
+            gh pr comment "$PR" --repo "$REPO" --body-file "$file"
+          fi
+
+          findings=$(for role in $(jq -r '.[]' <<< "$ROLES"); do
+            f="summaries/review-summary-$role/review-findings.json"
+            [ -s "$f" ] || continue
+            jq -c --arg r "$role" '[.[]? | objects
+              | select((.path | type) == "string" and (.line | type) == "number"
+                and (.body | type) == "string")
+              | {path, line, side: "RIGHT",
+                 body: ("**\($r):** " + (.body | sub("^(\\*\\*\($r):\\*\\* *)+"; "") | gsub("<!--"; "&lt;!--")))}]' "$f" \
+              || echo '[]'
+          done | jq -sc 'add // []')
+          replies=$(for role in $(jq -r '.[]' <<< "$ROLES"); do
+            f="summaries/review-summary-$role/review-findings.json"
+            [ -s "$f" ] || continue
+            jq -c --arg r "$role" '[.[]? | objects
+              | select((.reply_to | type) == "number" and (.body | type) == "string")
+              | {reply_to: (.reply_to | tostring), open: (.open == true), role: $r, body: ("**\($r):** " + (.body | sub("^(\\*\\*\($r):\\*\\* *)+"; "") | gsub("<!--"; "&lt;!--")))}]' "$f" \
+              || echo '[]'
+          done | jq -sc 'add // []')
+          # A reply that marks its finding still open reopens the resolved
+          # thread its reviewer started, so the review gate counts it again.
+          post_replies() {
+            [ "$replies" = "[]" ] && return
+            # Comment ids outgrow GraphQL's Int, so they are compared as the
+            # strings `fullDatabaseId` gives.
+            raw=$(gh api graphql --paginate -F owner="${REPO%/*}" -F name="${REPO#*/}" -F pr="$PR" -f query='
+              query($owner: String!, $name: String!, $pr: Int!, $endCursor: String) {
+                repository(owner: $owner, name: $name) {
+                  pullRequest(number: $pr) {
+                    reviewThreads(first: 100, after: $endCursor) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes { id isResolved comments(first: 100) { nodes { fullDatabaseId body author { __typename login } } } }
+                    }
+                  }
+                }
+              }' --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+                | select(.isResolved and (.comments.nodes[0]
+                  | .author.__typename == "Bot" and .author.login == "github-actions"))
+                | {id, root: .comments.nodes[0].body, comments: [.comments.nodes[].fullDatabaseId]}') \
+              || { echo "could not read the review threads"; raw=''; }
+            threads=$(jq -sc . <<< "$raw")
+            jq -c ".[]" <<< "$replies" | while read -r reply; do
+              to=$(jq -r .reply_to <<< "$reply")
+              gh api -X POST "repos/$REPO/pulls/$PR/comments/$to/replies" \
+                -f body="$(jq -r .body <<< "$reply")" > /dev/null || { echo "could not post a reply"; continue; }
+              thread=$(jq -r --argjson reply "$reply" 'if $reply.open then
+                map(select((.comments | index($reply.reply_to))
+                  and (.root | startswith("**\($reply.role):**")))) | .[0].id // empty
+                else empty end' <<< "$threads")
+              [ -z "$thread" ] || gh api graphql -F id="$thread" \
+                -f query='mutation($id: ID!) { unresolveReviewThread(input: {threadId: $id}) { thread { id } } }' \
+                > /dev/null || echo "could not reopen thread $thread"
+            done
+          }
+          # Replies come after the review, so it lands as one event.
+          trap post_replies EXIT
+          [ "$findings" = "[]" ] && exit 0
+          review=$(mktemp)
+          jq -n --arg sha "$SHA" --argjson c "$findings" '{commit_id: $sha,
+            event: "COMMENT", body: "Findings on \($sha[:7]).", comments: $c}' > "$review"
+          if ! gh api -X POST "repos/$REPO/pulls/$PR/reviews" --input "$review" > /dev/null; then
+            # One finding on a line outside the diff fails the whole review, so
+            # each is posted on its own, on its file when its line is outside
+            # the diff, and still gets a thread to resolve. Only one on a file
+            # outside the diff goes in a review's body.
+            rest=$(jq -c '.[]' <<< "$findings" | while read -r c; do
+              path=$(jq -r .path <<< "$c")
+              line=$(jq -r .line <<< "$c")
+              gh api -X POST "repos/$REPO/pulls/$PR/comments" -f commit_id="$SHA" \
+                -f path="$path" -F line="$line" -f side=RIGHT -f body="$(jq -r .body <<< "$c")" > /dev/null 2>&1 \
+                || gh api -X POST "repos/$REPO/pulls/$PR/comments" -f commit_id="$SHA" \
+                  -f path="$path" -f subject_type=file \
+                  -f body="$(jq -r '.line as $l | .body | sub("^(?<r>\\*\\*[a-z-]+:\\*\\*) *"; "\(.r) Line \($l): ")' <<< "$c")" > /dev/null 2>&1 \
+                || jq -r '"- `\(.path):\(.line)`: \(.body)"' <<< "$c"
+            done)
+            if [ -n "$rest" ]; then
+              jq -n --arg sha "$SHA" --arg rest "$rest" '{commit_id: $sha,
+                event: "COMMENT", body: "Findings on \($sha[:7]) outside the diff:\n\n\($rest)"}' > "$review"
+              gh api -X POST "repos/$REPO/pulls/$PR/reviews" --input "$review" > /dev/null
+            fi
+          fi
+
+  # Takes the `review` label off once the round ends, so adding it again asks for another.
+  unlabel:
+    needs: [roles, review]
+    # Fork PRs get a read-only token, so their label stays.
+    if: >-
+      always() && needs.roles.result == 'success' &&
+      contains(github.event.pull_request.labels.*.name, 'review') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - run: gh pr edit "$PR" --repo "$REPO" --remove-label review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}

@@ -6,7 +6,18 @@ Reusable routines you start on demand and tick off.
 - **Sub-routines**: a step can be a whole other routine (Breakfast inside Morning).
 - **Options (flags)**: give a step "Only if" `gym` / `!gym` / `abroad`. You pick the options when you start a run; hidden steps are bridged over.
 
-Run: `npm start` → http://localhost:8080. Test: `npm test`. Data lives in localStorage (Export/Import on the home page).
+## Developing
+
+```
+npm ci
+npm start            # http://localhost:8080/Routines/
+npm run check        # unit tests (node --test) + browser tests (Playwright)
+npm run screenshots  # every screen, light and dark, into ./screenshots
+```
+
+Data lives in localStorage (Export/Import under Routines). Changes go through
+pull requests reviewed by Claude reviewers; see `.github/reviewers/README.md`
+and `CLAUDE.md`.
 
 ## On your phone
 
