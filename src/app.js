@@ -88,7 +88,7 @@ function tagFor(run, n, showRun) {
 const readyRow = (run, n, showRun) => `
   <div class="card step" data-kind="step" data-run="${run.id}" data-id="${esc(n.id)}">
     <button class="check" data-act="toggle" data-run="${run.id}" data-id="${esc(n.id)}" aria-label="Done"></button>
-    <div class="grow label">${esc(n.title)}${tagFor(run, n, showRun)}</div>
+    <div class="grow label"><span class="title">${esc(n.title)}</span>${tagFor(run, n, showRun)}</div>
     <button class="ghost" data-act="skip" data-run="${run.id}" data-id="${esc(n.id)}">Skip</button>
   </div>`;
 
@@ -98,7 +98,7 @@ function waitingRow(run, n, showRun) {
   return `
   <div class="card step blocked" data-kind="step" data-run="${run.id}" data-id="${esc(n.id)}">
     <span class="check"></span>
-    <div class="grow label">${esc(n.title)}${tagFor(run, n, showRun)}
+    <div class="grow label"><span class="title">${esc(n.title)}</span>${tagFor(run, n, showRun)}
       <div class="muted">after ${after.join(', ')}</div></div>
   </div>`;
 }
@@ -278,7 +278,7 @@ function runView(id) {
     ${done.length ? `<h2>Done</h2>${done.map((n) => `
       <div class="card step ${run.done[n.id]}">
         <button class="check" data-act="toggle" data-run="${run.id}" data-id="${esc(n.id)}" aria-label="Undo">${run.done[n.id] === 'done' ? '✓' : '–'}</button>
-        <div class="grow label">${esc(n.title)}</div>
+        <div class="grow label"><span class="title">${esc(n.title)}</span></div>
       </div>`).join('')}` : ''}
     <div class="row" style="margin-top:20px">
       ${isTodo(run) && !run.finishedAt ? `<button data-act="unpull" data-id="${run.id}">Back to backlog</button>` : ''}
