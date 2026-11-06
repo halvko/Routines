@@ -3,8 +3,9 @@ model: opus
 ---
 
 Look for structural red flags: code whose shape makes it harder to reason
-about, slower, or harder to move to a shared, UI-free core (the plan is a
-headless core that a web and a native app share).
+about, slower, or harder to move to a shared, UI-free core (the plan, in
+`docs/decisions/0001` and `0002`, is a Rust core behind one synchronous
+`update(event)` that the web app, the server and a native app share).
 
 - Logic in the wrong home: a rule about routines, runs, steps or the backlog
   written in `src/app.js` (the UI) instead of `src/graph.js` or another

@@ -40,8 +40,8 @@ Some routines span days. Travel: check in online (usually before packing starts)
 
 ## Later
 
-- Rewrite in TypeScript once the shape has settled. Plain JS (no build step) is deliberate for now, to keep experimenting cheap.
-- Backend + login so it can be edited from a computer (phone stays the main entry point).
+- Rewrite on the decided stack (`docs/decisions/`): a Rust core shared by a Rust server and a React + TypeScript web app. Plain JS (no build step) stays until then, to keep experimenting cheap.
+- Backend + login so it can be edited from a computer (phone stays the main entry point). Sync and auth are decided (`docs/decisions/0003`, `0004`); where the server runs is still open.
 - **MCP server** on that backend, so Claude can be connected as an integration and manipulate tasks directly: read Today, add to the backlog, tick/drop steps, start and place routines, draft/edit routines. Needs the backend (data must live somewhere Claude can reach) and auth. Same tool surface the AI drafting feature would use.
 - AI drafting: "I need to do X" → suggested routine you then edit. Needs the backend to keep the API key off the phone.
 - Companion runs: a flag spawns linked routines already attached (starting Morning with `gym` also spawns Pack gym bag + After gym).

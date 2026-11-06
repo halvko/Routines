@@ -2,7 +2,9 @@
 
 A phone-first, installable web app for running routines, a backlog and the
 day. Plain JavaScript with no build step for now; `docs/design.md` is the
-product's source of truth and roadmap.
+product's source of truth and roadmap, and `docs/decisions/` records the
+technical decisions (Rust core and server, React + TypeScript web app) that
+the rewrite will follow.
 
 ## After making changes
 
