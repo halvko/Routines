@@ -14,7 +14,7 @@ Living document of where Routines is heading. Decisions marked ✅ are built.
 ## Build order
 
 1. **Today with several runs.** ✅ One mixed "Do now" list across all running routines, each step tagged with its routine. Toggle to group by routine instead — keep whichever wins in practice.
-2. **Attaching runs.** Any run can be attached *before* or *after* any step of another run. Its entry steps then wait on that step (or that step waits on its exit steps). E.g. "After gym" after *Commute home*; "Pack gym bag" before *Leave home*.
+2. **Attaching runs.** ✅ Any run can be attached *before* or *after* any step of another run. Its entry steps then wait on that step (or that step waits on its exit steps). E.g. "After gym" after *Commute home*; "Pack gym bag" before *Leave home*.
 3. **Day as the base routine.** A Day template whose steps are the stages: Wake up → Leave home → Commute home → Back home → Bedtime. Each day spawns a run of it. Flags like `weekend` remove stages (e.g. `!weekend` on the commute ones) and attached things bridge to neighbouring stages. One-off single steps can be added into a stage ("Call the dentist" after *Back home*). Planning = attaching to a future day ahead of time.
 4. **Leftovers inbox.** Starting a new day is one tap (or automatic) and never blocked by yesterday. Unfinished carry-over items go into an inbox, shown as a small badge (`4 left from yesterday`). It accumulates across days and nothing disappears without a decision. Actions per item: **Today** (pull into a stage), **Later** (into a future day), **Done**, **Drop**. ("Handled elsewhere", e.g. put in the calendar, is just Done.)
 5. **Carry-over setting per routine.** "If left unfinished: carry over / let lapse."
@@ -23,7 +23,7 @@ Living document of where Routines is heading. Decisions marked ✅ are built.
    - One-off steps added to a day carry over.
    - Sub-routine steps follow the routine they came from (Morning lapses, a "Pay bills" inside it carries over). Revisit if wrong in practice.
    - Morning/Breakfast-type routines: lapse. Per-step override only if missed in practice.
-6. **Backlog (plain to-do).** Somewhere to dump things with no plan: single items, no date, no stage. Instant capture via a `+` reachable from anywhere. Optional priority, set later (start with a star; maybe now-ish / normal / someday). Pull an item into Today, a stage, or a future day — same action as for leftovers. An item can grow into a routine (natural place for AI: "plan Anna's birthday" → suggested steps).
+6. **Backlog (plain to-do).** ✅ (leftovers part pending slice 4) Somewhere to dump things with no plan: single items, no date, no stage. Instant capture via a `+` reachable from anywhere. Optional priority, set later (start with a star; maybe now-ish / normal / someday). Pull an item into Today, a stage, or a future day — same action as for leftovers. An item can grow into a routine (natural place for AI: "plan Anna's birthday" → suggested steps).
    - **Leftovers live here too:** unfinished carry-over items land in the backlog marked "from yesterday", badged until seen. One source of truth for "didn't get to it" and "will get to it". Dumped items never nag; new leftovers badge until reviewed.
 7. **Dropping is first-class.** Drop a single step or a whole run any time, ideally a swipe. Not a failure state.
 
@@ -50,3 +50,4 @@ Goal: a little happiness from checking things off, never guilt. Fits the "no fix
 
 - Does a new day spawn automatically on first open, or via a "Start day" tap?
 - Today: mixed vs grouped — decide after real use.
+- A run can currently be placed relative to one step only. Enough?

@@ -94,20 +94,83 @@ export function expand(routines, rootId, flags = {}) {
 }
 
 const resolved = (run, id) => run.done[id] === 'done' || run.done[id] === 'skipped';
+const key = (runId, nodeId) => `${runId}\u0000${nodeId}`;
 
-/** Steps you can do right now. */
-export function ready(run) {
-  return run.nodes.filter((n) => !resolved(run, n.id) && n.deps.every((d) => resolved(run, d)));
+/** Steps nothing inside the run waits on before them. */
+export const roots = (run) => run.nodes.filter((n) => !n.deps.length);
+/** Steps nothing inside the run waits on after them. */
+export const sinks = (run) => {
+  const used = new Set(run.nodes.flatMap((n) => n.deps));
+  return run.nodes.filter((n) => !used.has(n.id));
+};
+
+/**
+ * Cross-run waiting created by attachments.
+ * run.attach = { rel: 'after'|'before', run: otherRunId, id: otherNodeId }
+ *  - after:  the run's first steps wait on that step.
+ *  - before: that step waits on the run's last steps.
+ * Returns Map(key(runId, nodeId) -> [{ run, id }]) of extra prerequisites.
+ */
+export function crossLinks(runs) {
+  const map = new Map();
+  const add = (toRun, toId, from) => {
+    const k = key(toRun, toId);
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(from);
+  };
+  for (const r of Object.values(runs)) {
+    const a = r.attach;
+    if (!a || !runs[a.run]) continue;
+    if (a.rel === 'after') roots(r).forEach((n) => add(r.id, n.id, { run: a.run, id: a.id }));
+    else sinks(r).forEach((n) => add(a.run, a.id, { run: r.id, id: n.id }));
+  }
+  return map;
 }
 
-/** Steps still blocked, each with the unresolved prerequisites. */
-export function waiting(run) {
+// ctx = { runs, links } — optional; without it only a run's own steps count.
+const extDeps = (ctx, run, id) => ctx?.links?.get(key(run.id, id)) || [];
+const extResolved = (ctx, x) => {
+  const r = ctx.runs[x.run];
+  return !r || !r.nodes.some((n) => n.id === x.id) || resolved(r, x.id);
+};
+const isReady = (run, n, ctx) =>
+  n.deps.every((d) => resolved(run, d)) && extDeps(ctx, run, n.id).every((x) => extResolved(ctx, x));
+
+/** Steps you can do right now. */
+export function ready(run, ctx) {
+  return run.nodes.filter((n) => !resolved(run, n.id) && isReady(run, n, ctx));
+}
+
+/** Steps still blocked: blockedBy = own unresolved steps, blockedExt = [{run,id}] in other runs. */
+export function waiting(run, ctx) {
   return run.nodes
-    .filter((n) => !resolved(run, n.id) && !n.deps.every((d) => resolved(run, d)))
-    .map((n) => ({ ...n, blockedBy: n.deps.filter((d) => !resolved(run, d)) }));
+    .filter((n) => !resolved(run, n.id) && !isReady(run, n, ctx))
+    .map((n) => ({
+      ...n,
+      blockedBy: n.deps.filter((d) => !resolved(run, d)),
+      blockedExt: extDeps(ctx, run, n.id).filter((x) => !extResolved(ctx, x)),
+    }));
 }
 
 export const isFinished = (run) => run.nodes.every((n) => resolved(run, n.id));
+
+/** Would the current attachments make steps across runs wait on each other in a loop? */
+export function hasCycle(runs) {
+  const links = crossLinks(runs);
+  const state = new Map(); // 1 = visiting, 2 = done
+  const visit = (runId, nodeId) => {
+    const k = key(runId, nodeId);
+    if (state.get(k) === 2) return false;
+    if (state.get(k) === 1) return true;
+    state.set(k, 1);
+    const node = runs[runId]?.nodes.find((n) => n.id === nodeId);
+    const deps = [...(node?.deps || []).map((d) => ({ run: runId, id: d })), ...(links.get(k) || [])];
+    const cyc = deps.some((d) => runs[d.run] && visit(d.run, d.id));
+    state.set(k, 2);
+    return cyc;
+  };
+  return Object.values(runs).some((r) => r.nodes.some((n) => visit(r.id, n.id)));
+}
 
 /** Would making `stepId` wait on `depId` create a cycle inside one routine? */
 export function wouldCycle(routine, stepId, depId) {

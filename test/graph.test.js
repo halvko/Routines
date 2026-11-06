@@ -96,3 +96,50 @@ test('editor guards', () => {
   assert.ok(includes({ a, b }, 'a', 'b'));
   assert.ok(!includes({ a, b }, 'b', 'a'));
 });
+
+/* ---------- attaching runs ---------- */
+import { crossLinks, hasCycle } from '../src/graph.js';
+
+const mkRun = (id, nodes, attach) => ({ id, nodes, done: {}, flags: {}, ...(attach ? { attach } : {}) });
+const n = (id, deps = []) => ({ id, title: id.toUpperCase(), deps, source: 'x' });
+
+test('attach after: first steps wait on the other run\'s step', () => {
+  const day = mkRun('day', [n('wake'), n('commute', ['wake']), n('home', ['commute'])]);
+  const gym = mkRun('gym', [n('unpack'), n('wash', ['unpack']), n('bottle')], { rel: 'after', run: 'day', id: 'commute' });
+  const runs = { day, gym };
+  const ctx = () => ({ runs, links: crossLinks(runs) });
+  assert.deepEqual(ids(ready(gym, ctx())), []);
+  const w = waiting(gym, ctx());
+  assert.deepEqual(w.find((x) => x.id === 'unpack').blockedExt, [{ run: 'day', id: 'commute' }]);
+  assert.deepEqual(w.find((x) => x.id === 'wash').blockedExt, []); // waits only on unpack
+  day.done.wake = 'done';
+  day.done.commute = 'done';
+  assert.deepEqual(ids(ready(gym, ctx())), ['unpack', 'bottle']);
+});
+
+test('attach before: the other run\'s step waits on this run\'s last steps', () => {
+  const day = mkRun('day', [n('wake'), n('leave', ['wake'])]);
+  const pack = mkRun('pack', [n('shoes'), n('towel'), n('close', ['shoes', 'towel'])], { rel: 'before', run: 'day', id: 'leave' });
+  const runs = { day, pack };
+  const ctx = () => ({ runs, links: crossLinks(runs) });
+  day.done.wake = 'done';
+  assert.deepEqual(ids(ready(day, ctx())), []);
+  assert.deepEqual(waiting(day, ctx())[0].blockedExt, [{ run: 'pack', id: 'close' }]);
+  pack.done.shoes = pack.done.towel = 'done';
+  pack.done.close = 'skipped';
+  assert.deepEqual(ids(ready(day, ctx())), ['leave']);
+});
+
+test('attachment to a deleted run is ignored', () => {
+  const todo = mkRun('t', [n('call')], { rel: 'after', run: 'gone', id: 'x' });
+  const runs = { t: todo };
+  assert.deepEqual(ids(ready(todo, { runs, links: crossLinks(runs) })), ['call']);
+});
+
+test('cross-run loops are detected', () => {
+  const a = mkRun('a', [n('a1'), n('a2', ['a1'])], { rel: 'after', run: 'b', id: 'b1' });
+  const b = mkRun('b', [n('b1')]);
+  assert.ok(!hasCycle({ a, b }));
+  b.attach = { rel: 'after', run: 'a', id: 'a2' };
+  assert.ok(hasCycle({ a, b }));
+});

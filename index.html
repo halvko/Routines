@@ -15,8 +15,15 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="top"><a href="#/" class="brand">Routines</a></header>
+  <header class="top">
+    <nav class="tabs">
+      <a href="#/" data-tab="today">Today</a>
+      <a href="#/backlog" data-tab="backlog">Backlog <span class="count" id="backlog-count"></span></a>
+      <a href="#/routines" data-tab="routines">Routines</a>
+    </nav>
+  </header>
   <main id="app"></main>
+  <button class="fab" data-act="capture" aria-label="Add to backlog">+</button>
   <dialog id="dlg"></dialog>
   <div id="toast" role="status"></div>
   <input type="file" id="file" accept="application/json" hidden>

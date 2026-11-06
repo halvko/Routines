@@ -44,12 +44,14 @@ export function seed() {
       },
     },
     runs: {},
+    backlog: [],
     prefs: { todayMode: 'mixed' },
   };
 }
 
 export function normalize(db) {
   db.prefs = { todayMode: 'mixed', ...(db.prefs || {}) };
+  db.backlog = db.backlog || [];
   return db;
 }
 
