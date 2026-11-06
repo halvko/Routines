@@ -37,10 +37,9 @@ Living document of where Routines is heading. Decisions marked ✅ are built.
 
 Goal: a little happiness from checking things off, never guilt. Fits the "no fixed cadence" philosophy, so no streaks that punish a missed day.
 
-- Make ticking itself satisfying first: animation, haptic tap, a small celebration when a routine or the day completes.
+- Animations are the core: make ticking itself satisfying (check animation, haptic tap) and celebrate a finished routine or day with something a bit bigger.
 - Gentle counts: steps done today, a week view. Rewards what happened; never shows what was missed.
 - Earning vices: completed steps earn points that can be spent on self-chosen treats ("an episode", "dessert"). Allowing yourself things, explicitly.
-- Missions: an occasional optional challenge ("finish Morning before 8 three times this week").
 
 ## Open questions
 
