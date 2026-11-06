@@ -135,3 +135,9 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 6px; }
 #toast.has-action.show { pointer-events: auto; display: flex; align-items: center; gap: 14px; }
 #toast button { background: none; border: 0; color: var(--accent); font-weight: 700; padding: 4px 2px; }
 @media (prefers-color-scheme: light) { #toast button { color: #a5b4fc; } }
+
+/* focus mode: a run / routine / editor gets the whole screen */
+body.focus .top { display: none; }
+body.focus main { padding-top: calc(12px + env(safe-area-inset-top)); }
+body.focus .fab { display: none; }
+button.back { font-size: 16px; color: var(--accent); padding: 6px 0; margin-bottom: 2px; }

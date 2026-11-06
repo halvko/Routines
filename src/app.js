@@ -52,6 +52,13 @@ function openDialog(html, onSubmit, cls = '') {
 
 /* ---------- helpers ---------- */
 
+// Collapsible sections stay open/closed across re-renders (ticking a step, coming back to a screen).
+const openSections = new Set();
+document.addEventListener('toggle', (e) => {
+  const k = e.target.dataset?.key;
+  if (k) e.target.open ? openSections.add(k) : openSections.delete(k);
+}, true);
+
 const ctx = () => ({ runs: db.runs, links: crossLinks(db.runs) });
 const activeRuns = () => Object.values(db.runs).filter((r) => !r.finishedAt).sort((a, b) => a.startedAt - b.startedAt);
 const flagsOf = (run) => Object.keys(run.flags).filter((f) => run.flags[f]);
@@ -137,7 +144,7 @@ function todayView() {
     const wait = active.flatMap((run) => waiting(run, c).map((n) => waitingRow(run, n, multi)));
     body = `
       ${rdy.length ? `<h2>Do now</h2>${rdy.join('')}` : `<div class="card empty">Everything left is waiting on something.</div>`}
-      ${wait.length ? `<details class="coming"><summary><h2>Coming up · ${wait.length}</h2></summary>${wait.join('')}</details>` : ''}
+      ${wait.length ? `<details class="coming" data-key="coming" ${openSections.has('coming') ? 'open' : ''}><summary><h2>Coming up · ${wait.length}</h2></summary>${wait.join('')}</details>` : ''}
       <h2>Running</h2>${active.map(runCard).join('')}`;
   }
 
@@ -176,7 +183,7 @@ function backlogView() {
         <span class="muted">${esc(placementText(db.runs[i.runId]) || 'now')} ›</span></div></a>`).join('')}` : ''}
     ${waitingItems.length ? `<h2>To do · ${waitingItems.length}</h2>${waitingItems.map(row).join('')}`
       : `<div class="card empty">Nothing here. Dump things as they come up — no dates, no plan.</div>`}
-    ${done.length ? `<details class="coming"><summary><h2>Done · ${db.backlog.filter((i) => i.doneAt).length}</h2></summary>
+    ${done.length ? `<details class="coming" data-key="done" ${openSections.has('done') ? 'open' : ''}><summary><h2>Done · ${db.backlog.filter((i) => i.doneAt).length}</h2></summary>
       ${done.map((i) => `<div class="card step done">
         <button class="check" data-act="itemUndo" data-id="${i.id}" aria-label="Undo">✓</button>
         <div class="grow label">${esc(i.title)}</div></div>`).join('')}</details>` : ''}`;
@@ -238,7 +245,7 @@ function routineView(id) {
   const fl = collectFlags(db.routines, id);
   const running = activeRuns().filter((x) => x.routineId === id);
   return `
-    <a href="#/routines" class="back">‹ Routines</a>
+    ${backLink('#/routines')}
     <div class="row head"><h1 class="grow">${esc(r.name)}</h1><a class="btn" href="#/edit/${r.id}">Edit</a></div>
     ${fl.length ? `<p class="muted">Options when starting: ${tags(fl)}</p>` : ''}
     <button class="primary wide-btn" data-act="start" data-id="${r.id}">▶ Start ${esc(r.name)}</button>
@@ -257,7 +264,7 @@ function runView(id) {
   const placed = placementText(run);
 
   return `
-    <a href="#/" class="back">‹ Today</a>
+    ${backLink('#/')}
     <h1>${esc(run.name)}</h1>
     ${flagsOf(run).length ? `<div class="tags" style="margin-bottom:8px">${tags(flagsOf(run))}</div>` : ''}
     ${run.finishedAt ? '' : `<div class="card row placement">
@@ -287,6 +294,7 @@ function editView(id) {
   const subOptions = Object.values(db.routines).filter((o) => o.id !== id && !includes(db.routines, o.id, id));
 
   return `
+    ${backLink(`#/routine/${r.id}`)}
     <h1>Edit routine</h1>
     <div class="card"><input type="text" data-routine-name value="${esc(r.name)}" aria-label="Routine name">
       ${flags.length ? `<div class="muted" style="margin-top:8px">Options when starting: ${flags.map((f) => `<span class="tag">${esc(f)}</span>`).join(' ')}</div>` : ''}</div>
@@ -313,7 +321,7 @@ function editView(id) {
       <button class="primary" data-act="addStep">+ Step</button>
       ${subOptions.length ? `<button data-act="addSub">+ Sub-routine</button>` : ''}
     </div>
-    <div class="row" style="margin-top:24px"><a class="btn" href="#/routine/${r.id}">Done</a>
+    <div class="row" style="margin-top:24px"><button data-act="back" data-fallback="#/routine/${r.id}">Done</button>
       <button class="danger" data-act="delRoutine">Delete routine</button></div>`;
 }
 
@@ -324,8 +332,34 @@ function route() {
   return { view: view || 'today', id };
 }
 
+const FOCUS_VIEWS = ['run', 'routine', 'edit'];
+
+// Where "back" goes: the previous screen if we navigated here inside the app, else a sensible parent.
+const norm = (h) => (!h || h === '#' ? '#/' : h);
+// Each history entry gets an index (history.state.i) so we always know whether we moved back or forward.
+const nav = { i: 0, stack: [norm(location.hash)], scroll: {} };
+function initNav() {
+  nav.i = typeof history.state?.i === 'number' ? history.state.i : 0;
+  history.replaceState({ i: nav.i }, '', location.hash || '#/');
+  nav.stack = [];
+  nav.stack[nav.i] = norm(location.hash);
+}
+
+function labelFor(hash) {
+  const [, view, id] = norm(hash).split('/');
+  if (view === 'routine' || view === 'edit') return db.routines[id]?.name || 'Routines';
+  if (view === 'run') return db.runs[id]?.name || 'Today';
+  return { backlog: 'Backlog', routines: 'Routines' }[view] || 'Today';
+}
+
+function backLink(fallback) {
+  const prev = (nav.i > 0 && nav.stack[nav.i - 1]) || fallback;
+  return `<button class="back linkish" data-act="back" data-fallback="${esc(fallback)}">‹ ${esc(labelFor(prev))}</button>`;
+}
+
 function render() {
   const { view, id } = route();
+  document.body.classList.toggle('focus', FOCUS_VIEWS.includes(view));
   const views = { today: todayView, backlog: backlogView, routines: routinesView, routine: () => routineView(id), run: () => runView(id), edit: () => editView(id) };
   $app.innerHTML = (views[view] || todayView)();
   const tab = view === 'edit' || view === 'routine' ? 'routines' : view === 'run' ? 'today' : view;
@@ -334,7 +368,38 @@ function render() {
   document.getElementById('backlog-count').textContent = open || '';
 }
 
-window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', (e) => {
+  const to = norm(location.hash);
+  nav.scroll[norm(new URL(e.oldURL).hash)] = window.scrollY;
+  const from = nav.i;
+  if (typeof history.state?.i === 'number') nav.i = history.state.i; // back/forward through history
+  else { nav.i = from + 1; history.replaceState({ i: nav.i }, '', location.hash); } // a new screen
+  nav.stack.length = nav.i;
+  nav.stack[nav.i] = to;
+  const goingBack = nav.i < from;
+  render();
+  // coming back to a screen puts you where you were on it
+  window.scrollTo(0, goingBack ? nav.scroll[to] || 0 : 0);
+  rememberRoute();
+});
+
+// Reopening the app (e.g. after the phone closed it in the background) returns to what was open.
+const LAST = 'routines.lastRoute';
+const RESUME_MS = 60 * 60 * 1000;
+function rememberRoute() {
+  try { localStorage.setItem(LAST, JSON.stringify({ hash: norm(location.hash), at: Date.now() })); } catch {}
+}
+function resumeRoute() {
+  if (norm(location.hash) !== '#/') return;
+  try {
+    const last = JSON.parse(localStorage.getItem(LAST) || 'null');
+    if (!last || Date.now() - last.at > RESUME_MS || last.hash === '#/') return;
+    const [, view, id] = last.hash.split('/');
+    const exists = view === 'run' ? db.runs[id] : view === 'routine' || view === 'edit' ? db.routines[id] : true;
+    if (!exists) return;
+    history.replaceState({ i: 0 }, '', last.hash);
+  } catch {}
+}
 
 /* ---------- runs ---------- */
 
@@ -489,6 +554,14 @@ function itemDialog(it) {
   });
 }
 
+// Go back if there is somewhere to go back to, otherwise replace this screen with `fallback`.
+function leave(fallback) {
+  if (nav.i > 0) return history.back();
+  history.replaceState({ i: 0 }, '', fallback);
+  nav.stack = [norm(fallback)];
+  render(); window.scrollTo(0, 0); rememberRoute();
+}
+
 /* ---------- swipe & hold ---------- */
 
 // Returns a toast if the routine is used inside others (so it can't be deleted).
@@ -612,6 +685,7 @@ const routineOf = () => db.routines[route().id];
 const stepEl = (el) => routineOf().steps.find((s) => s.id === el.closest('[data-sid]').dataset.sid);
 
 const actions = {
+  back: (d) => leave(d.fallback),
   start: (d) => startRoutine(d.id),
   mode(d) { db.prefs.todayMode = d.mode; persist(); render(); },
   toggle(d) {
@@ -624,7 +698,7 @@ const actions = {
     const run = db.runs[d.id];
     if (!confirm(isTodo(run) ? `Delete “${run.name}” completely?` : 'Remove this run?')) return;
     if (run.backlogId) db.backlog = db.backlog.filter((i) => i.id !== run.backlogId);
-    removeRun(d.id); persist(); location.hash = '#/';
+    removeRun(d.id); persist(); leave('#/');
   },
   unpull(d) {
     const run = db.runs[d.id];
@@ -769,7 +843,10 @@ document.getElementById('file').addEventListener('change', async (e) => {
   } catch { toast('Not a valid routines file'); }
 });
 
+resumeRoute();
+initNav();
 render();
+rememberRoute();
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 // Ask the browser not to evict our localStorage under storage pressure.
