@@ -27,6 +27,7 @@ Living document of where Routines is heading. Decisions marked ✅ are built.
 
 ## Later
 
+- Rewrite in TypeScript once the shape has settled. Plain JS (no build step) is deliberate for now, to keep experimenting cheap.
 - Backend + login so it can be edited from a computer (phone stays the main entry point).
 - AI drafting: "I need to do X" → suggested routine you then edit. Needs the backend to keep the API key off the phone.
 - Companion runs: a flag spawns linked routines already attached (starting Morning with `gym` also spawns Pack gym bag + After gym).
