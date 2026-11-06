@@ -6,6 +6,12 @@ by editing history away; the old file then says which one replaced it.
 
 Research behind them lives in `docs/research/`.
 
+**How we weigh risk.** This is a personal project, not a business: alpha and
+pre-1.0 technology is fine wherever failing means rework (an API changes, a
+feature is missing). It is not fine where failing could lose the owner's
+data: routines, runs and the backlog are their source of truth, so storage
+must have backups and an export path, whatever else we try.
+
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-languages.md) | Rust for the core and the server; TypeScript + React only in the browser | Accepted |
