@@ -171,9 +171,8 @@ function routinesView() {
     ${Object.values(db.routines).map((r) => {
       const fl = collectFlags(db.routines, r.id);
       return `<div class="card row">
-        <div class="grow"><strong>${esc(r.name)}</strong>
-          <div class="muted">${r.steps.length} steps${fl.length ? ' · ' + fl.map(esc).join(', ') : ''}</div></div>
-        <a class="btn" href="#/edit/${r.id}">Edit</a>
+        <a class="grow plain" href="#/routine/${r.id}"><strong>${esc(r.name)}</strong>
+          <div class="muted">${r.steps.length} steps${fl.length ? ' · ' + fl.map(esc).join(', ') : ''}</div></a>
         <button class="primary" data-act="start" data-id="${r.id}">Start</button>
       </div>`;
     }).join('')}
@@ -184,6 +183,50 @@ function routinesView() {
         <button class="ghost" data-act="delRun" data-id="${r.id}" aria-label="Remove">✕</button></div>`).join('')}` : ''}
     <h2>Data</h2>
     <div class="row"><button data-act="export">Export</button><button data-act="import">Import</button></div>`;
+}
+
+// Steps in an order that respects "after" (ties keep the order they were written in).
+function stepOrder(r) {
+  const byId = new Map(r.steps.map((st) => [st.id, st]));
+  const out = [];
+  const seen = new Set();
+  const visit = (st) => {
+    if (seen.has(st.id)) return;
+    seen.add(st.id);
+    st.after.forEach((e) => byId.has(e.id) && visit(byId.get(e.id)));
+    out.push(st);
+  };
+  r.steps.forEach(visit);
+  return out;
+}
+
+function stepsList(r, stack = []) {
+  const byId = new Map(r.steps.map((st) => [st.id, st]));
+  const name = (st) => (st.type === 'routine' ? db.routines[st.routineId]?.name ?? '(missing)' : st.title || '(untitled)');
+  return `<ol class="steps">${stepOrder(r).map((st) => {
+    const after = st.after.filter((e) => byId.has(e.id)).map((e) => esc(name(byId.get(e.id))) + (e.when ? ` <span class="tag">if ${esc(e.when)}</span>` : ''));
+    const sub = st.type === 'routine' && db.routines[st.routineId] && !stack.includes(st.routineId) ? db.routines[st.routineId] : null;
+    return `<li class="${st.type === 'routine' ? 'sub' : ''}">
+      <div class="row"><span class="grow">${st.type === 'routine' ? '↳ ' : ''}${esc(name(st))}</span>${st.when ? `<span class="tag">only if ${esc(st.when)}</span>` : ''}</div>
+      ${after.length ? `<div class="muted small">after ${after.join(', ')}</div>` : ''}
+      ${sub ? stepsList(sub, [...stack, r.id]) : ''}
+    </li>`;
+  }).join('')}</ol>`;
+}
+
+function routineView(id) {
+  const r = db.routines[id];
+  if (!r) return `<p>Routine not found. <a href="#/routines">Back</a></p>`;
+  const fl = collectFlags(db.routines, id);
+  const running = activeRuns().filter((x) => x.routineId === id);
+  return `
+    <a href="#/routines" class="back">‹ Routines</a>
+    <div class="row head"><h1 class="grow">${esc(r.name)}</h1><a class="btn" href="#/edit/${r.id}">Edit</a></div>
+    ${fl.length ? `<p class="muted">Options when starting: ${tags(fl)}</p>` : ''}
+    <button class="primary wide-btn" data-act="start" data-id="${r.id}">▶ Start ${esc(r.name)}</button>
+    ${running.length ? `<h2>Running now</h2>${running.map(runCard).join('')}` : ''}
+    <h2>Steps</h2>
+    ${r.steps.length ? `<div class="card">${stepsList(r)}</div>` : `<div class="card empty">No steps yet. <a href="#/edit/${r.id}">Add some</a>.</div>`}`;
 }
 
 function runView(id) {
@@ -252,7 +295,7 @@ function editView(id) {
       <button class="primary" data-act="addStep">+ Step</button>
       ${subOptions.length ? `<button data-act="addSub">+ Sub-routine</button>` : ''}
     </div>
-    <div class="row" style="margin-top:24px"><a class="btn" href="#/routines">Done</a>
+    <div class="row" style="margin-top:24px"><a class="btn" href="#/routine/${r.id}">Done</a>
       <button class="danger" data-act="delRoutine">Delete routine</button></div>`;
 }
 
@@ -265,9 +308,9 @@ function route() {
 
 function render() {
   const { view, id } = route();
-  const views = { today: todayView, backlog: backlogView, routines: routinesView, run: () => runView(id), edit: () => editView(id) };
+  const views = { today: todayView, backlog: backlogView, routines: routinesView, routine: () => routineView(id), run: () => runView(id), edit: () => editView(id) };
   $app.innerHTML = (views[view] || todayView)();
-  const tab = view === 'edit' ? 'routines' : view === 'run' ? 'today' : view;
+  const tab = view === 'edit' || view === 'routine' ? 'routines' : view === 'run' ? 'today' : view;
   document.querySelectorAll('[data-tab]').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));
   const open = openBacklog().filter((i) => !(i.runId && db.runs[i.runId])).length;
   document.getElementById('backlog-count').textContent = open || '';
