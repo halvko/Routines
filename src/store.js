@@ -44,7 +44,13 @@ export function seed() {
       },
     },
     runs: {},
+    prefs: { todayMode: 'mixed' },
   };
+}
+
+export function normalize(db) {
+  db.prefs = { todayMode: 'mixed', ...(db.prefs || {}) };
+  return db;
 }
 
 export function load() {
@@ -52,7 +58,7 @@ export function load() {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const db = JSON.parse(raw);
-      if (db && db.routines && db.runs) return db;
+      if (db && db.routines && db.runs) return normalize(db);
     }
   } catch {}
   return seed();

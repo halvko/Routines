@@ -56,3 +56,22 @@ dialog::backdrop { background: #0008; }
 #toast { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
   padding: 10px 16px; border-radius: 10px; opacity: 0; pointer-events: none; transition: opacity .2s; }
 #toast.show { opacity: 1; }
+
+/* today */
+.head { margin-bottom: 4px; }
+.head h1 { margin: 4px 0; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; flex: none; }
+.seg button { border: 0; border-radius: 0; padding: 6px 12px; font-size: 14px; color: var(--muted); }
+.seg button.on { background: var(--accent); color: var(--accent-text); }
+.from { font-size: 12px; color: var(--accent); margin-top: 2px; font-weight: 500; }
+.empty { color: var(--muted); text-align: center; padding: 24px; }
+.runcard, .group-head { display: block; color: inherit; text-decoration: none; }
+.group { margin: 20px 0 8px; }
+.group-head { display: flex; align-items: center; gap: 8px; padding: 4px 2px; }
+.group .bar { margin: 4px 0 10px; }
+.more { padding: 2px 4px 8px; }
+details.coming summary { list-style: none; cursor: pointer; }
+details.coming summary::-webkit-details-marker { display: none; }
+details.coming summary h2::after { content: ' ▸'; }
+details.coming[open] summary h2::after { content: ' ▾'; }
+.back { display: inline-block; margin-bottom: 4px; text-decoration: none; font-size: 15px; }

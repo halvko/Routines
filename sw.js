@@ -1,5 +1,5 @@
 // Network-first: you always get the latest version when online, the cached one offline.
-const CACHE = 'routines-v1';
+const CACHE = 'routines-v2';
 const SHELL = ['./', 'index.html', 'style.css', 'src/app.js', 'src/graph.js', 'src/store.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 

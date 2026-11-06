@@ -1,5 +1,5 @@
 import { expand, collectFlags, ready, waiting, isFinished, wouldCycle, includes } from './graph.js';
-import { load, save } from './store.js';
+import { load, save, normalize } from './store.js';
 
 let db = load();
 const $app = document.getElementById('app');
@@ -18,36 +18,87 @@ function toast(msg) {
 
 /* ---------- views ---------- */
 
-function homeView() {
-  const runs = Object.values(db.runs).sort((a, b) => b.startedAt - a.startedAt);
-  const active = runs.filter((r) => !r.finishedAt);
-  const recent = runs.filter((r) => r.finishedAt).slice(0, 5);
+const activeRuns = () => Object.values(db.runs).filter((r) => !r.finishedAt).sort((a, b) => a.startedAt - b.startedAt);
+const flagsOf = (run) => Object.keys(run.flags).filter((f) => run.flags[f]);
+const progress = (run) => ({ n: run.nodes.filter((x) => run.done[x.id]).length, total: run.nodes.length });
+const bar = ({ n, total }) => `<div class="bar"><i style="width:${total ? (n / total) * 100 : 100}%"></i></div>`;
+const namesOf = (run) => Object.fromEntries(run.nodes.map((n) => [n.id, n.title]));
+
+// tag under a step: which routine it belongs to. In a single-routine context only sub-routines are named.
+function tagFor(run, n, showRun) {
+  const parts = showRun ? [run.name] : [];
+  if (n.source !== run.name) parts.push(n.source);
+  return parts.length ? `<div class="from">${parts.map(esc).join(' · ')}</div>` : '';
+}
+
+const readyRow = (run, n, showRun) => `
+  <div class="card step">
+    <button class="check" data-act="toggle" data-run="${run.id}" data-id="${esc(n.id)}" aria-label="Done"></button>
+    <div class="grow label">${esc(n.title)}${tagFor(run, n, showRun)}</div>
+    <button class="ghost" data-act="skip" data-run="${run.id}" data-id="${esc(n.id)}">Skip</button>
+  </div>`;
+
+const waitingRow = (run, n, showRun, names = namesOf(run)) => `
+  <div class="card step blocked">
+    <span class="check"></span>
+    <div class="grow label">${esc(n.title)}${tagFor(run, n, showRun)}
+      <div class="muted">after ${n.blockedBy.map((b) => esc(names[b])).join(', ')}</div></div>
+  </div>`;
+
+function todayView() {
+  const active = activeRuns();
+  const mode = db.prefs.todayMode;
+  const recent = Object.values(db.runs).filter((r) => r.finishedAt).sort((a, b) => b.finishedAt - a.finishedAt).slice(0, 5);
   const routines = Object.values(db.routines);
 
-  const runCard = (r) => {
-    const total = r.nodes.length;
-    const n = r.nodes.filter((x) => r.done[x.id]).length;
-    const flags = Object.keys(r.flags).filter((f) => r.flags[f]);
-    return `<a class="card" style="display:block;color:inherit;text-decoration:none" href="#/run/${r.id}">
-      <div class="row"><strong class="grow">${esc(r.name)}</strong><span class="muted">${n}/${total}</span></div>
-      ${flags.length ? `<div class="tags">${flags.map((f) => `<span class="tag">${esc(f)}</span>`).join('')}</div>` : ''}
-      <div class="bar"><i style="width:${total ? (n / total) * 100 : 100}%"></i></div></a>`;
-  };
+  let body;
+  if (!active.length) {
+    body = `<div class="card empty">Nothing running. Start a routine below.</div>`;
+  } else if (mode === 'grouped') {
+    body = active.map((run) => {
+      const rdy = ready(run);
+      const wait = waiting(run).length;
+      return `<section class="group">
+        <a class="group-head" href="#/run/${run.id}"><strong class="grow">${esc(run.name)}</strong>
+          ${flagsOf(run).map((f) => `<span class="tag">${esc(f)}</span>`).join('')}
+          <span class="muted">${progress(run).n}/${progress(run).total} ›</span></a>
+        ${bar(progress(run))}
+        ${rdy.map((n) => readyRow(run, n, false)).join('')}
+        ${wait ? `<div class="muted more">+ ${wait} waiting</div>` : ''}
+      </section>`;
+    }).join('');
+  } else {
+    const rdy = active.flatMap((run) => ready(run).map((n) => readyRow(run, n, active.length > 1)));
+    const wait = active.flatMap((run) => { const names = namesOf(run); return waiting(run).map((n) => waitingRow(run, n, active.length > 1, names)); });
+    body = `
+      ${rdy.length ? `<h2>Do now</h2>${rdy.join('')}` : ''}
+      ${wait.length ? `<details class="coming"><summary><h2>Coming up · ${wait.length}</h2></summary>${wait.join('')}</details>` : ''}
+      <h2>Running</h2>
+      ${active.map((run) => `<a class="card runcard" href="#/run/${run.id}">
+        <div class="row"><strong class="grow">${esc(run.name)}</strong>
+          ${flagsOf(run).map((f) => `<span class="tag">${esc(f)}</span>`).join('')}
+          <span class="muted">${progress(run).n}/${progress(run).total} ›</span></div>${bar(progress(run))}</a>`).join('')}`;
+  }
 
   return `
-    <h1>Routines</h1>
-    ${active.length ? `<h2>In progress</h2>${active.map(runCard).join('')}` : ''}
+    <div class="row head"><h1 class="grow">Today</h1>
+      ${active.length ? `<div class="seg" role="group" aria-label="Layout">
+        <button class="${mode !== 'grouped' ? 'on' : ''}" data-act="mode" data-mode="mixed">Mixed</button>
+        <button class="${mode === 'grouped' ? 'on' : ''}" data-act="mode" data-mode="grouped">By routine</button></div>` : ''}</div>
+    ${body}
     <h2>Start a routine</h2>
-    ${routines.map((r) => `
-      <div class="card row">
+    ${routines.map((r) => {
+      const fl = collectFlags(db.routines, r.id);
+      return `<div class="card row">
         <div class="grow"><strong>${esc(r.name)}</strong>
-          <div class="muted">${r.steps.length} steps${collectFlags(db.routines, r.id).length ? ' · ' + collectFlags(db.routines, r.id).map(esc).join(', ') : ''}</div></div>
+          <div class="muted">${r.steps.length} steps${fl.length ? ' · ' + fl.map(esc).join(', ') : ''}</div></div>
         <a class="btn" href="#/edit/${r.id}">Edit</a>
         <button class="primary" data-act="start" data-id="${r.id}">Start</button>
-      </div>`).join('')}
+      </div>`;
+    }).join('')}
     <button data-act="newRoutine">+ New routine</button>
     ${recent.length ? `<h2>Recently finished</h2>${recent.map((r) => `
-      <div class="card row"><span class="grow">${esc(r.name)}</span>
+      <div class="card row"><a class="grow" href="#/run/${r.id}">${esc(r.name)}</a>
         <span class="muted">${new Date(r.finishedAt).toLocaleDateString()}</span>
         <button class="ghost" data-act="delRun" data-id="${r.id}" aria-label="Remove">✕</button></div>`).join('')}` : ''}
     <h2>Data</h2>
@@ -57,38 +108,27 @@ function homeView() {
 function runView(id) {
   const run = db.runs[id];
   if (!run) return `<p>Run not found. <a href="#/">Back</a></p>`;
-  const names = Object.fromEntries(run.nodes.map((n) => [n.id, n.title]));
+  const names = namesOf(run);
   const rdy = ready(run);
   const wait = waiting(run);
   const done = run.nodes.filter((n) => run.done[n.id]);
-  const finished = isFinished(run);
-  const flags = Object.keys(run.flags).filter((f) => run.flags[f]);
-  const src = (n) => (n.source !== run.name ? `<div class="muted">${esc(n.source)}</div>` : '');
+  const flags = flagsOf(run);
 
   return `
+    <a href="#/" class="back">‹ Today</a>
     <h1>${esc(run.name)}</h1>
     ${flags.length ? `<div class="tags" style="margin-bottom:8px">${flags.map((f) => `<span class="tag">${esc(f)}</span>`).join('')}</div>` : ''}
-    <div class="bar"><i style="width:${(done.length / (run.nodes.length || 1)) * 100}%"></i></div>
-    ${finished ? `<div class="banner">All done ✓</div><button class="primary" data-act="finish" data-id="${run.id}">Finish</button>` : ''}
-    ${rdy.length ? `<h2>Do now</h2>${rdy.map((n) => `
-      <div class="card step">
-        <button class="check" data-act="toggle" data-run="${run.id}" data-id="${esc(n.id)}" aria-label="Done"></button>
-        <div class="grow label">${esc(n.title)}${src(n)}</div>
-        <button class="ghost" data-act="skip" data-run="${run.id}" data-id="${esc(n.id)}">Skip</button>
-      </div>`).join('')}` : ''}
-    ${wait.length ? `<h2>Waiting</h2>${wait.map((n) => `
-      <div class="card step blocked">
-        <span class="check"></span>
-        <div class="grow label">${esc(n.title)}${src(n)}
-          <div class="muted">after ${n.blockedBy.map((b) => esc(names[b])).join(', ')}</div></div>
-      </div>`).join('')}` : ''}
+    ${bar(progress(run))}
+    ${run.finishedAt ? `<div class="banner">All done ✓</div>` : ''}
+    ${rdy.length ? `<h2>Do now</h2>${rdy.map((n) => readyRow(run, n, false)).join('')}` : ''}
+    ${wait.length ? `<h2>Waiting</h2>${wait.map((n) => waitingRow(run, n, false, names)).join('')}` : ''}
     ${done.length ? `<h2>Done</h2>${done.map((n) => `
       <div class="card step ${run.done[n.id]}">
         <button class="check" data-act="toggle" data-run="${run.id}" data-id="${esc(n.id)}" aria-label="Undo">${run.done[n.id] === 'done' ? '✓' : '–'}</button>
         <div class="grow label">${esc(n.title)}</div>
       </div>`).join('')}` : ''}
-    <div class="row" style="margin-top:20px"><a class="btn" href="#/">Back</a>
-      <button class="danger" data-act="abandon" data-id="${run.id}">Abandon run</button></div>`;
+    <div class="row" style="margin-top:20px">
+      <button class="danger" data-act="abandon" data-id="${run.id}">${run.finishedAt ? 'Delete run' : 'Abandon run'}</button></div>`;
 }
 
 const stepLabel = (s) => (s.type === 'routine' ? '↳ ' + (db.routines[s.routineId]?.name ?? '(missing)') : s.title || '(untitled)');
@@ -139,7 +179,7 @@ function route() {
 
 function render() {
   const { view, id } = route();
-  $app.innerHTML = view === 'run' ? runView(id) : view === 'edit' ? editView(id) : homeView();
+  $app.innerHTML = view === 'run' ? runView(id) : view === 'edit' ? editView(id) : todayView();
 }
 
 window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
@@ -154,7 +194,8 @@ function createRun(rid, flags) {
   r.lastFlags = flags;
   db.runs[run.id] = run;
   persist();
-  location.hash = `#/run/${run.id}`;
+  toast(`Started ${r.name}`);
+  if (route().view === 'home') render(); else location.hash = '#/';
 }
 
 function startRoutine(rid) {
@@ -174,6 +215,14 @@ function startRoutine(rid) {
   };
   $dlg.returnValue = '';
   $dlg.showModal();
+}
+
+// A run finishes by itself when its last step is resolved, and reopens if you undo one.
+function settle(run) {
+  const fin = isFinished(run);
+  if (fin && !run.finishedAt) { run.finishedAt = Date.now(); toast(`${run.name} done ✓`); }
+  if (!fin) delete run.finishedAt;
+  persist(); render();
 }
 
 /* ---------- actions ---------- */
@@ -201,10 +250,10 @@ const actions = {
   toggle(d) {
     const run = db.runs[d.run];
     if (run.done[d.id]) delete run.done[d.id]; else run.done[d.id] = 'done';
-    persist(); render();
+    settle(run);
   },
-  skip(d) { db.runs[d.run].done[d.id] = 'skipped'; persist(); render(); },
-  finish(d) { db.runs[d.id].finishedAt = Date.now(); persist(); location.hash = '#/'; },
+  skip(d) { db.runs[d.run].done[d.id] = 'skipped'; settle(db.runs[d.run]); },
+  mode(d) { db.prefs.todayMode = d.mode; persist(); render(); },
   abandon(d) { if (confirm('Abandon this run?')) { delete db.runs[d.id]; persist(); location.hash = '#/'; } },
   delRun(d) { delete db.runs[d.id]; persist(); render(); },
 
@@ -289,7 +338,7 @@ document.getElementById('file').addEventListener('change', async (e) => {
     const data = JSON.parse(await f.text());
     if (!data.routines || !data.runs) throw new Error();
     if (!confirm('Replace everything with the imported file?')) return;
-    db = data;
+    db = normalize(data);
     persist(); render();
     toast('Imported');
   } catch { toast('Not a valid routines file'); }
