@@ -117,3 +117,21 @@ ol.steps ol.steps { margin-top: 6px; padding-left: 4px; border-left: 2px solid v
 ol.steps ol.steps > li { border-bottom: 0; padding-top: 4px; padding-bottom: 4px; }
 li.sub > .row { font-weight: 600; }
 .small { font-size: 13px; }
+
+/* swipe & hold */
+[data-kind] { -webkit-user-drag: none; touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.swiping { position: relative; z-index: 1; }
+.swipe-under { position: fixed; z-index: 0; border-radius: 12px; background: #f87171; color: #fff; font-weight: 600;
+  display: flex; align-items: center; justify-content: flex-end; padding-right: 20px; box-sizing: border-box; transition: background .12s; }
+.swipe-under.armed { background: #dc2626; }
+.held { transform: scale(.98); transition: transform .15s; }
+dialog.sheet { margin: auto auto 0; width: 100%; max-width: 520px; border-radius: 18px 18px 0 0; border-bottom: 0;
+  padding: 8px 12px calc(12px + env(safe-area-inset-bottom)); }
+dialog.sheet form { display: flex; flex-direction: column; gap: 6px; }
+.sheet-title { text-align: center; color: var(--muted); font-size: 14px; padding: 8px 4px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-btn { width: 100%; padding: 14px; font-size: 17px; border-radius: 12px; }
+.sheet-btn.danger { color: #dc2626; }
+.sheet-btn.cancel { margin-top: 6px; font-weight: 600; }
+#toast.has-action.show { pointer-events: auto; display: flex; align-items: center; gap: 14px; }
+#toast button { background: none; border: 0; color: var(--accent); font-weight: 700; padding: 4px 2px; }
+@media (prefers-color-scheme: light) { #toast button { color: #a5b4fc; } }

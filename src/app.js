@@ -1,5 +1,6 @@
 import { expand, collectFlags, ready, waiting, isFinished, wouldCycle, includes, crossLinks, hasCycle } from './graph.js';
 import { load, save, normalize } from './store.js';
+import { initGestures } from './gestures.js';
 
 let db = load();
 const $app = document.getElementById('app');
@@ -8,19 +9,36 @@ const uid = () => Math.random().toString(36).slice(2, 8);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const persist = () => save(db);
 
-function toast(msg) {
+// action = { label, fn } adds a button (e.g. Undo) and keeps the toast up a little longer
+function toast(msg, action) {
   const el = document.getElementById('toast');
   el.textContent = msg;
+  if (action) {
+    const btn = document.createElement('button');
+    btn.textContent = action.label;
+    btn.onclick = () => { el.classList.remove('show'); action.fn(); };
+    el.append(btn);
+  }
+  el.classList.toggle('has-action', !!action);
   el.classList.add('show');
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => el.classList.remove('show'), 2200);
+  toast.t = setTimeout(() => el.classList.remove('show'), action ? 5000 : 2200);
+}
+
+// Do something destructive with an Undo button that restores everything as it was.
+function undoable(msg, fn) {
+  const snapshot = JSON.stringify(db);
+  if (fn() === false) return;
+  persist(); render();
+  toast(msg, { label: 'Undo', fn: () => { db = normalize(JSON.parse(snapshot)); persist(); render(); } });
 }
 
 /* ---------- dialogs ---------- */
 
 // Opens a form dialog. onSubmit(formData, buttonValue) runs when closed via a submit button.
 // Buttons with data-close (type=button) just close; Enter submits with the first submit button.
-function openDialog(html, onSubmit) {
+function openDialog(html, onSubmit, cls = '') {
+  $dlg.className = cls;
   $dlg.innerHTML = `<form method="dialog">${html}</form>`;
   const form = $dlg.querySelector('form');
   $dlg.onclose = () => {
@@ -61,7 +79,7 @@ function tagFor(run, n, showRun) {
 }
 
 const readyRow = (run, n, showRun) => `
-  <div class="card step">
+  <div class="card step" data-kind="step" data-run="${run.id}" data-id="${esc(n.id)}">
     <button class="check" data-act="toggle" data-run="${run.id}" data-id="${esc(n.id)}" aria-label="Done"></button>
     <div class="grow label">${esc(n.title)}${tagFor(run, n, showRun)}</div>
     <button class="ghost" data-act="skip" data-run="${run.id}" data-id="${esc(n.id)}">Skip</button>
@@ -71,14 +89,14 @@ function waitingRow(run, n, showRun) {
   const names = Object.fromEntries(run.nodes.map((x) => [x.id, x.title]));
   const after = [...n.blockedBy.map((b) => esc(names[b])), ...n.blockedExt.map((x) => esc(nodeLabel(x)))];
   return `
-  <div class="card step blocked">
+  <div class="card step blocked" data-kind="step" data-run="${run.id}" data-id="${esc(n.id)}">
     <span class="check"></span>
     <div class="grow label">${esc(n.title)}${tagFor(run, n, showRun)}
       <div class="muted">after ${after.join(', ')}</div></div>
   </div>`;
 }
 
-const runCard = (run) => `<a class="card runcard" href="#/run/${run.id}">
+const runCard = (run) => `<a class="card runcard" href="#/run/${run.id}" data-kind="run" data-id="${run.id}">
   <div class="row"><strong class="grow">${esc(run.name)}</strong>${tags(flagsOf(run))}
     <span class="muted">${progress(run).n}/${progress(run).total} ›</span></div>
   ${placementText(run) ? `<div class="placed">${esc(placementText(run))}</div>` : ''}
@@ -140,7 +158,7 @@ function backlogView() {
   const done = db.backlog.filter((i) => i.doneAt).sort((a, b) => b.doneAt - a.doneAt).slice(0, 30);
 
   const row = (i) => `
-    <div class="card step">
+    <div class="card step" data-kind="item" data-id="${i.id}">
       <button class="check" data-act="itemDone" data-id="${i.id}" aria-label="Done"></button>
       <button class="grow label linkish" data-act="item" data-id="${i.id}">${esc(i.title)}</button>
       <button class="ghost star ${i.starred ? 'on' : ''}" data-act="star" data-id="${i.id}" aria-label="${i.starred ? 'Unstar' : 'Star'}">${i.starred ? '★' : '☆'}</button>
@@ -154,7 +172,7 @@ function backlogView() {
       <button class="primary">Add</button>
     </form>
     ${inToday.length ? `<h2>In Today</h2>${inToday.map((i) => `
-      <a class="card runcard" href="#/run/${i.runId}"><div class="row"><span class="grow">${esc(i.title)}</span>
+      <a class="card runcard" href="#/run/${i.runId}" data-kind="run" data-id="${i.runId}"><div class="row"><span class="grow">${esc(i.title)}</span>
         <span class="muted">${esc(placementText(db.runs[i.runId]) || 'now')} ›</span></div></a>`).join('')}` : ''}
     ${waitingItems.length ? `<h2>To do · ${waitingItems.length}</h2>${waitingItems.map(row).join('')}`
       : `<div class="card empty">Nothing here. Dump things as they come up — no dates, no plan.</div>`}
@@ -170,7 +188,7 @@ function routinesView() {
     <h1>Routines</h1>
     ${Object.values(db.routines).map((r) => {
       const fl = collectFlags(db.routines, r.id);
-      return `<div class="card row">
+      return `<div class="card row" data-kind="routine" data-id="${r.id}">
         <a class="grow plain" href="#/routine/${r.id}"><strong>${esc(r.name)}</strong>
           <div class="muted">${r.steps.length} steps${fl.length ? ' · ' + fl.map(esc).join(', ') : ''}</div></a>
         <button class="primary" data-act="start" data-id="${r.id}">Start</button>
@@ -471,6 +489,123 @@ function itemDialog(it) {
   });
 }
 
+/* ---------- swipe & hold ---------- */
+
+// Returns a toast if the routine is used inside others (so it can't be deleted).
+function routineUsers(id) {
+  const users = Object.values(db.routines).filter((o) => o.id !== id && o.steps.some((st) => st.type === 'routine' && st.routineId === id));
+  if (users.length) toast(`Used by ${users.map((u) => u.name).join(', ')}`);
+  return users.length > 0;
+}
+
+// What "swipe left" does for a row, and what it's called.
+function swipeFor(el) {
+  const d = el.dataset;
+  if (d.kind === 'step') {
+    const run = db.runs[d.run];
+    return isTodo(run)
+      ? { label: 'Delete', fn: () => deleteTodoRun(run) }
+      : { label: 'Drop', fn: () => undoable(`Dropped ${run.nodes.find((n) => n.id === d.id)?.title}`, () => { run.done[d.id] = 'skipped'; settleQuiet(run); }) };
+  }
+  if (d.kind === 'item') return { label: 'Delete', fn: () => { const it = item(d.id); undoable(`Deleted ${it.title}`, () => { db.backlog = db.backlog.filter((i) => i !== it); }); } };
+  if (d.kind === 'run') {
+    const run = db.runs[d.id];
+    return isTodo(run)
+      ? { label: 'Delete', fn: () => deleteTodoRun(run) }
+      : { label: 'Abandon', fn: () => undoable(`Abandoned ${run.name}`, () => removeRun(run.id)) };
+  }
+  if (d.kind === 'routine') {
+    const r = db.routines[d.id];
+    return { label: 'Delete', fn: () => { if (!routineUsers(r.id)) undoable(`Deleted ${r.name}`, () => { delete db.routines[r.id]; }); } };
+  }
+  return null;
+}
+
+function deleteTodoRun(run) {
+  undoable(`Deleted ${run.name}`, () => {
+    if (run.backlogId) db.backlog = db.backlog.filter((i) => i.id !== run.backlogId);
+    removeRun(run.id);
+  });
+}
+
+// settle() without its own persist/render/toast, for use inside undoable()
+function settleQuiet(run) {
+  if (isFinished(run)) run.finishedAt = run.finishedAt || Date.now(); else delete run.finishedAt;
+  const it = run.backlogId && db.backlog.find((i) => i.id === run.backlogId);
+  if (it) it.doneAt = run.finishedAt || undefined;
+}
+
+// Everything you can do with a row; shown as a sheet on long-press / right-click.
+function holdActions(el) {
+  const d = el.dataset;
+  const swipe = swipeFor(el);
+  const del = swipe && { label: swipe.label, danger: true, fn: swipe.fn };
+  if (d.kind === 'step') {
+    const run = db.runs[d.run];
+    const node = run.nodes.find((n) => n.id === d.id);
+    const blocked = !ready(run, ctx()).some((n) => n.id === d.id);
+    const list = [
+      { label: blocked ? 'Done anyway' : 'Done', fn: () => actions.toggle({ run: run.id, id: d.id }) },
+    ];
+    if (isTodo(run)) {
+      list.push({ label: 'Place…', fn: () => actions.place({ id: run.id }) });
+      list.push({ label: 'Back to backlog', fn: () => actions.unpull({ id: run.id }) });
+    } else {
+      list.push({ label: 'Skip', fn: () => actions.skip({ run: run.id, id: d.id }) });
+      list.push({ label: `Open ${run.name}`, fn: () => { location.hash = `#/run/${run.id}`; } });
+      list.push({ label: `Place ${run.name}…`, fn: () => actions.place({ id: run.id }) });
+    }
+    return { title: node.title, list: [...list, del] };
+  }
+  if (d.kind === 'item') {
+    const it = item(d.id);
+    return { title: it.title, list: [
+      { label: 'Done', fn: () => actions.itemDone({ id: it.id }) },
+      { label: 'Do today…', fn: () => pullItem(it) },
+      { label: it.starred ? 'Unstar' : '★ Star', fn: () => actions.star({ id: it.id }) },
+      { label: 'Edit', fn: () => itemDialog(it) },
+      del,
+    ] };
+  }
+  if (d.kind === 'run') {
+    const run = db.runs[d.id];
+    const list = [
+      { label: 'Open', fn: () => { location.hash = `#/run/${run.id}`; } },
+      { label: run.attach ? 'Move…' : 'Place…', fn: () => actions.place({ id: run.id }) },
+    ];
+    if (run.attach) list.push({ label: 'Unplace', fn: () => actions.detach({ id: run.id }) });
+    if (isTodo(run)) list.push({ label: 'Back to backlog', fn: () => actions.unpull({ id: run.id }) });
+    return { title: run.name, list: [...list, del] };
+  }
+  if (d.kind === 'routine') {
+    const r = db.routines[d.id];
+    return { title: r.name, list: [
+      { label: 'Start', fn: () => startRoutine(r.id) },
+      { label: 'Open', fn: () => { location.hash = `#/routine/${r.id}`; } },
+      { label: 'Edit', fn: () => { location.hash = `#/edit/${r.id}`; } },
+      del,
+    ] };
+  }
+  return null;
+}
+
+function openSheet(el) {
+  const spec = holdActions(el);
+  if (!spec) return;
+  const list = spec.list.filter(Boolean);
+  openDialog(`
+    <div class="sheet-title">${esc(spec.title)}</div>
+    ${list.map((a, i) => `<button class="sheet-btn ${a.danger ? 'danger' : ''}" value="${i}">${esc(a.label)}</button>`).join('')}
+    <button type="button" class="sheet-btn cancel" data-close>Cancel</button>`,
+  (_, v) => list[Number(v)]?.fn(), 'sheet');
+}
+
+initGestures({
+  swipeLabel: (el) => swipeFor(el)?.label,
+  onSwipe: (el) => swipeFor(el)?.fn(),
+  onHold: openSheet,
+});
+
 /* ---------- actions ---------- */
 
 const routineOf = () => db.routines[route().id];
@@ -528,12 +663,9 @@ const actions = {
   },
   delRoutine() {
     const r = routineOf();
-    const users = Object.values(db.routines).filter((o) => o.id !== r.id && o.steps.some((s) => s.type === 'routine' && s.routineId === r.id));
-    if (users.length) return toast(`Used by ${users.map((u) => u.name).join(', ')}`);
-    if (!confirm(`Delete "${r.name}"?`)) return;
-    delete db.routines[r.id];
-    persist();
+    if (routineUsers(r.id)) return;
     location.hash = '#/routines';
+    undoable(`Deleted ${r.name}`, () => { delete db.routines[r.id]; });
   },
   addStep() {
     const r = routineOf();
@@ -589,8 +721,13 @@ const actions = {
   import: () => document.getElementById('file').click(),
 };
 
+const outside = (el, e) => {
+  const r = el.getBoundingClientRect();
+  return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+};
+
 document.addEventListener('click', (e) => {
-  if (e.target.closest('[data-close]')) { $dlg.close(); return; }
+  if (e.target.closest('[data-close]') || (e.target === $dlg && outside($dlg, e))) { $dlg.close(); return; } // Cancel / tap outside
   const el = e.target.closest('[data-act]');
   if (!el) return;
   actions[el.dataset.act]?.(el.dataset, el);
