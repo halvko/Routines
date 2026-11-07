@@ -1,0 +1,23 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -124,3 +124,6 @@
+     "std",
+     "fmt",
+ ]
++
++[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies.js-sys]
++version = "0.3"
+--- a/src/core.rs
++++ b/src/core.rs
+@@ -396,7 +396,11 @@
+             allow_synchronised_authenticators,
+         } = state;
+         let chal: ChallengeRef = challenge;
++        // Patched for Cloudflare Workers: std has no clock on wasm32-unknown-unknown.
++        #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+         let current_time = SystemTime::now();
++        #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
++        let current_time = SystemTime::UNIX_EPOCH + Duration::from_millis(js_sys::Date::now() as u64);
+ 
+         // send to register_credential_internal
+         let credential = self.register_credential_internal(
