@@ -9,6 +9,19 @@ Judge the tests the diff adds or changes, and the tests it should have.
   `test/visual/` only captures screenshots. A change to behaviour comes
   with a test at the level where the behaviour lives, and a bug fix with a
   test that fails without the fix.
+- The domain rules exist twice while the app moves to the Rust core:
+  `src/graph.js` and `core/` (crate `routines-core`). Their shared tests are
+  data: `core/tests/vectors/*.json`, each case an input and the expected
+  output, run by `test/vectors.test.js` against the JavaScript and by
+  `core/tests/vectors.rs` against Rust. A change to a rule changes both
+  implementations and comes with a vector case, not a test in one language
+  only. `npm run vectors` writes the `expected` values from the JavaScript,
+  so read every changed `expected` as a change in behaviour: is it the one
+  the PR describes? A vector case that cannot fail (a rule the input never
+  reaches, an empty result that every bug would also give) checks nothing.
+- `core/tests/stored.rs` loads data captured from the app
+  (`core/tests/fixtures/stored.json`). A change to what is stored updates
+  that fixture and checks that older data still loads.
 - Is the expected result right? Read each test as the user would and say
   whether they would expect that outcome. A test that pins a wrong result
   pins a bug, whatever its name says.

@@ -8,6 +8,7 @@
     "test": "node --test \"test/*.test.js\"",
     "e2e": "playwright test",
     "screenshots": "playwright test -c playwright.screens.config.js",
+    "vectors": "node tools/vectors.mjs",
     "check": "npm test && npm run e2e"
   },
   "devDependencies": {

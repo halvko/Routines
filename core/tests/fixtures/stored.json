@@ -1,0 +1,541 @@
+{
+  "routines": {
+    "breakfast": {
+      "id": "breakfast",
+      "name": "Breakfast",
+      "steps": [
+        {
+          "id": "coffee",
+          "type": "task",
+          "title": "Start the coffee",
+          "when": "",
+          "after": []
+        },
+        {
+          "id": "food",
+          "type": "task",
+          "title": "Make food",
+          "when": "",
+          "after": []
+        },
+        {
+          "id": "eat",
+          "type": "task",
+          "title": "Eat",
+          "when": "",
+          "after": [
+            {
+              "id": "coffee"
+            },
+            {
+              "id": "food"
+            }
+          ]
+        },
+        {
+          "id": "clean",
+          "type": "task",
+          "title": "Clean up",
+          "when": "",
+          "after": [
+            {
+              "id": "eat"
+            }
+          ]
+        }
+      ],
+      "lastFlags": {}
+    },
+    "morning": {
+      "id": "morning",
+      "name": "Morning",
+      "steps": [
+        {
+          "id": "wake",
+          "type": "task",
+          "title": "Get out of bed",
+          "when": "",
+          "after": []
+        },
+        {
+          "id": "water",
+          "type": "task",
+          "title": "Drink a glass of water",
+          "when": "",
+          "after": [
+            {
+              "id": "wake"
+            }
+          ]
+        },
+        {
+          "id": "gym",
+          "type": "task",
+          "title": "Gym session",
+          "when": "gym",
+          "after": [
+            {
+              "id": "water"
+            }
+          ]
+        },
+        {
+          "id": "shower",
+          "type": "task",
+          "title": "Shower",
+          "when": "",
+          "after": [
+            {
+              "id": "wake"
+            },
+            {
+              "id": "gym"
+            }
+          ]
+        },
+        {
+          "id": "teeth",
+          "type": "task",
+          "title": "Brush teeth",
+          "when": "",
+          "after": [
+            {
+              "id": "shower"
+            }
+          ]
+        },
+        {
+          "id": "dress",
+          "type": "task",
+          "title": "Get dressed",
+          "when": "",
+          "after": [
+            {
+              "id": "teeth"
+            }
+          ]
+        },
+        {
+          "id": "bf",
+          "type": "routine",
+          "routineId": "breakfast",
+          "when": "",
+          "after": [
+            {
+              "id": "dress"
+            }
+          ]
+        },
+        {
+          "id": "meds",
+          "type": "task",
+          "title": "Take vitamins",
+          "when": "",
+          "after": [
+            {
+              "id": "bf"
+            }
+          ]
+        }
+      ],
+      "lastFlags": {
+        "gym": true
+      }
+    },
+    "travel": {
+      "id": "travel",
+      "name": "Travel",
+      "steps": [
+        {
+          "id": "checkin",
+          "type": "task",
+          "title": "Check in online",
+          "when": "flying",
+          "after": []
+        },
+        {
+          "id": "passport",
+          "type": "task",
+          "title": "Passport",
+          "when": "abroad",
+          "after": []
+        },
+        {
+          "id": "adapter",
+          "type": "task",
+          "title": "Power adapter",
+          "when": "abroad",
+          "after": []
+        },
+        {
+          "id": "clothes",
+          "type": "task",
+          "title": "Clothes",
+          "when": "",
+          "after": []
+        },
+        {
+          "id": "toiletries",
+          "type": "task",
+          "title": "Toiletries",
+          "when": "",
+          "after": [
+            {
+              "id": "clothes"
+            }
+          ]
+        },
+        {
+          "id": "charger",
+          "type": "task",
+          "title": "Phone charger",
+          "when": "",
+          "after": []
+        },
+        {
+          "id": "close",
+          "type": "task",
+          "title": "Pack the bag",
+          "when": "",
+          "after": [
+            {
+              "id": "passport"
+            },
+            {
+              "id": "adapter"
+            },
+            {
+              "id": "toiletries"
+            },
+            {
+              "id": "charger"
+            },
+            {
+              "id": "checkin"
+            }
+          ]
+        },
+        {
+          "id": "lights",
+          "type": "task",
+          "title": "Lights off, windows shut",
+          "when": "",
+          "after": [
+            {
+              "id": "close"
+            }
+          ]
+        },
+        {
+          "id": "lock",
+          "type": "task",
+          "title": "Lock the door",
+          "when": "",
+          "after": [
+            {
+              "id": "lights"
+            }
+          ]
+        }
+      ],
+      "lastFlags": {
+        "abroad": true,
+        "flying": false
+      }
+    }
+  },
+  "runs": {
+    "mw9ncx": {
+      "id": "mw9ncx",
+      "routineId": "breakfast",
+      "name": "Breakfast",
+      "flags": {},
+      "nodes": [
+        {
+          "id": "coffee",
+          "title": "Start the coffee",
+          "deps": [],
+          "source": "Breakfast"
+        },
+        {
+          "id": "food",
+          "title": "Make food",
+          "deps": [],
+          "source": "Breakfast"
+        },
+        {
+          "id": "eat",
+          "title": "Eat",
+          "deps": [
+            "coffee",
+            "food"
+          ],
+          "source": "Breakfast"
+        },
+        {
+          "id": "clean",
+          "title": "Clean up",
+          "deps": [
+            "eat"
+          ],
+          "source": "Breakfast"
+        }
+      ],
+      "done": {
+        "coffee": "done",
+        "food": "done",
+        "eat": "done",
+        "clean": "done"
+      },
+      "startedAt": 1794085484532,
+      "finishedAt": 1794085484757
+    },
+    "kx0opi": {
+      "id": "kx0opi",
+      "routineId": "morning",
+      "name": "Morning",
+      "flags": {
+        "gym": true
+      },
+      "nodes": [
+        {
+          "id": "wake",
+          "title": "Get out of bed",
+          "deps": [],
+          "source": "Morning"
+        },
+        {
+          "id": "water",
+          "title": "Drink a glass of water",
+          "deps": [
+            "wake"
+          ],
+          "source": "Morning"
+        },
+        {
+          "id": "gym",
+          "title": "Gym session",
+          "deps": [
+            "water"
+          ],
+          "source": "Morning"
+        },
+        {
+          "id": "shower",
+          "title": "Shower",
+          "deps": [
+            "wake",
+            "gym"
+          ],
+          "source": "Morning"
+        },
+        {
+          "id": "teeth",
+          "title": "Brush teeth",
+          "deps": [
+            "shower"
+          ],
+          "source": "Morning"
+        },
+        {
+          "id": "dress",
+          "title": "Get dressed",
+          "deps": [
+            "teeth"
+          ],
+          "source": "Morning"
+        },
+        {
+          "id": "bf/coffee",
+          "title": "Start the coffee",
+          "deps": [
+            "dress"
+          ],
+          "source": "Breakfast"
+        },
+        {
+          "id": "bf/food",
+          "title": "Make food",
+          "deps": [
+            "dress"
+          ],
+          "source": "Breakfast"
+        },
+        {
+          "id": "bf/eat",
+          "title": "Eat",
+          "deps": [
+            "bf/coffee",
+            "bf/food"
+          ],
+          "source": "Breakfast"
+        },
+        {
+          "id": "bf/clean",
+          "title": "Clean up",
+          "deps": [
+            "bf/eat"
+          ],
+          "source": "Breakfast"
+        },
+        {
+          "id": "meds",
+          "title": "Take vitamins",
+          "deps": [
+            "bf/clean"
+          ],
+          "source": "Morning"
+        }
+      ],
+      "done": {
+        "wake": "done"
+      },
+      "startedAt": 1794085484919
+    },
+    "gi8xf7": {
+      "id": "gi8xf7",
+      "routineId": "travel",
+      "name": "Travel",
+      "flags": {
+        "abroad": true,
+        "flying": false
+      },
+      "nodes": [
+        {
+          "id": "passport",
+          "title": "Passport",
+          "deps": [],
+          "source": "Travel"
+        },
+        {
+          "id": "adapter",
+          "title": "Power adapter",
+          "deps": [],
+          "source": "Travel"
+        },
+        {
+          "id": "clothes",
+          "title": "Clothes",
+          "deps": [],
+          "source": "Travel"
+        },
+        {
+          "id": "toiletries",
+          "title": "Toiletries",
+          "deps": [
+            "clothes"
+          ],
+          "source": "Travel"
+        },
+        {
+          "id": "charger",
+          "title": "Phone charger",
+          "deps": [],
+          "source": "Travel"
+        },
+        {
+          "id": "close",
+          "title": "Pack the bag",
+          "deps": [
+            "passport",
+            "adapter",
+            "toiletries",
+            "charger"
+          ],
+          "source": "Travel"
+        },
+        {
+          "id": "lights",
+          "title": "Lights off, windows shut",
+          "deps": [
+            "close"
+          ],
+          "source": "Travel"
+        },
+        {
+          "id": "lock",
+          "title": "Lock the door",
+          "deps": [
+            "lights"
+          ],
+          "source": "Travel"
+        }
+      ],
+      "done": {},
+      "startedAt": 1794085485101,
+      "attach": {
+        "rel": "after",
+        "run": "kx0opi",
+        "id": "dress"
+      }
+    },
+    "89lqxb": {
+      "id": "89lqxb",
+      "kind": "todo",
+      "backlogId": "vje820",
+      "name": "Call the dentist",
+      "flags": {},
+      "done": {},
+      "startedAt": 1794085485584,
+      "nodes": [
+        {
+          "id": "task",
+          "title": "Call the dentist",
+          "deps": [],
+          "source": "Call the dentist"
+        }
+      ],
+      "attach": {
+        "rel": "before",
+        "run": "kx0opi",
+        "id": "teeth"
+      }
+    },
+    "evknwg": {
+      "id": "evknwg",
+      "kind": "todo",
+      "backlogId": "a2kloe",
+      "name": "Water plants",
+      "flags": {},
+      "done": {
+        "task": "done"
+      },
+      "startedAt": 1794085485735,
+      "nodes": [
+        {
+          "id": "task",
+          "title": "Water plants",
+          "deps": [],
+          "source": "Water plants"
+        }
+      ],
+      "finishedAt": 1794085485772
+    }
+  },
+  "backlog": [
+    {
+      "id": "vje820",
+      "title": "Call the dentist",
+      "starred": false,
+      "createdAt": 1794085485351,
+      "runId": "89lqxb"
+    },
+    {
+      "id": "71zqi1",
+      "title": "Renew passport",
+      "starred": true,
+      "createdAt": 1794085485417
+    },
+    {
+      "id": "a2kloe",
+      "title": "Water plants",
+      "starred": false,
+      "createdAt": 1794085485470,
+      "runId": "evknwg",
+      "doneAt": 1794085485772
+    }
+  ],
+  "prefs": {
+    "todayMode": "mixed"
+  }
+}

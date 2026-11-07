@@ -1,0 +1,116 @@
+{
+  "about": "parseCond and condHolds: conditions on flags.",
+  "cases": [
+    {
+      "name": "one flag",
+      "fn": "parseCond",
+      "input": {"cond":"gym"},
+      "expected": [{"flag":"gym","neg":false}]
+    },
+    {
+      "name": "negated flag",
+      "fn": "parseCond",
+      "input": {"cond":"!gym"},
+      "expected": [{"flag":"gym","neg":true}]
+    },
+    {
+      "name": "several flags separated by spaces",
+      "fn": "parseCond",
+      "input": {"cond":"abroad flying"},
+      "expected": [{"flag":"abroad","neg":false},{"flag":"flying","neg":false}]
+    },
+    {
+      "name": "commas, extra spaces and capitals",
+      "fn": "parseCond",
+      "input": {"cond":"  Abroad,, !Rain ,flying "},
+      "expected": [
+        {"flag":"abroad","neg":false},
+        {"flag":"rain","neg":true},
+        {"flag":"flying","neg":false}
+      ]
+    },
+    {
+      "name": "tabs, newlines and no-break spaces separate too",
+      "fn": "parseCond",
+      "input": {"cond":"a\tb\nc d　e"},
+      "expected": [
+        {"flag":"a","neg":false},
+        {"flag":"b","neg":false},
+        {"flag":"c","neg":false},
+        {"flag":"d","neg":false},
+        {"flag":"e","neg":false}
+      ]
+    },
+    {
+      "name": "a lone \"!\" is dropped",
+      "fn": "parseCond",
+      "input": {"cond":"! gym !"},
+      "expected": [{"flag":"gym","neg":false}]
+    },
+    {
+      "name": "only the first \"!\" negates",
+      "fn": "parseCond",
+      "input": {"cond":"!!gym"},
+      "expected": [{"flag":"!gym","neg":true}]
+    },
+    {"name":"empty condition","fn":"parseCond","input":{"cond":""},"expected":[]},
+    {"name":"missing condition","fn":"parseCond","input":{},"expected":[]},
+    {
+      "name": "empty condition always holds",
+      "fn": "condHolds",
+      "input": {"cond":"","flags":{}},
+      "expected": true
+    },
+    {
+      "name": "missing condition always holds",
+      "fn": "condHolds",
+      "input": {"flags":{"gym":true}},
+      "expected": true
+    },
+    {"name":"flag off","fn":"condHolds","input":{"cond":"gym","flags":{}},"expected":false},
+    {"name":"flag on","fn":"condHolds","input":{"cond":"gym","flags":{"gym":true}},"expected":true},
+    {
+      "name": "flag set to false",
+      "fn": "condHolds",
+      "input": {"cond":"gym","flags":{"gym":false}},
+      "expected": false
+    },
+    {"name":"negated flag, off","fn":"condHolds","input":{"cond":"!gym","flags":{}},"expected":true},
+    {
+      "name": "negated flag, on",
+      "fn": "condHolds",
+      "input": {"cond":"!gym","flags":{"gym":true}},
+      "expected": false
+    },
+    {
+      "name": "all terms must hold: one off",
+      "fn": "condHolds",
+      "input": {"cond":"abroad flying","flags":{"abroad":true}},
+      "expected": false
+    },
+    {
+      "name": "all terms must hold: both on",
+      "fn": "condHolds",
+      "input": {"cond":"abroad flying","flags":{"abroad":true,"flying":true}},
+      "expected": true
+    },
+    {
+      "name": "mixed terms",
+      "fn": "condHolds",
+      "input": {"cond":"abroad, !flying","flags":{"abroad":true,"flying":false}},
+      "expected": true
+    },
+    {
+      "name": "condition is matched lowercased",
+      "fn": "condHolds",
+      "input": {"cond":"Gym","flags":{"gym":true}},
+      "expected": true
+    },
+    {
+      "name": "flag names are matched exactly (a capitalised flag never matches)",
+      "fn": "condHolds",
+      "input": {"cond":"gym","flags":{"Gym":true}},
+      "expected": false
+    }
+  ]
+}

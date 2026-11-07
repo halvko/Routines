@@ -9,7 +9,8 @@ headless core that a web and a native app share).
 - Logic in the wrong home: a rule about routines, runs, steps or the backlog
   written in `src/app.js` (the UI) instead of `src/graph.js` or another
   module with no DOM in it. Rules belong where they can be tested and shared
-  without a browser.
+  without a browser. The Rust core (`core/`) is where rules are heading:
+  it does no I/O, has no async, and takes and returns plain data.
 - Overlapping work along a call path: the same lookup, validation or
   computation done by a caller and its callee, or once per row when once
   per render would do (computing cross-run links inside a loop over runs is

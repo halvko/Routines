@@ -1,0 +1,1325 @@
+{
+  "about": "expand: flattening a routine and its sub-routines into the steps of a run.",
+  "cases": [
+    {
+      "name": "hidden steps are bridged out",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "m": {
+            "id": "m",
+            "name": "Morning",
+            "steps": [
+              {"id":"wake","type":"task","title":"Wake","after":[]},
+              {"id":"gym","type":"task","title":"Gym","after":[{"id":"wake"}],"when":"gym"},
+              {"id":"shower","type":"task","title":"Shower","after":[{"id":"wake"},{"id":"gym"}]},
+              {"id":"dress","type":"task","title":"Dress","after":[{"id":"shower"}]}
+            ]
+          }
+        },
+        "root": "m",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"wake","title":"Wake","deps":[],"source":"Morning"},
+        {"id":"shower","title":"Shower","deps":["wake"],"source":"Morning"},
+        {"id":"dress","title":"Dress","deps":["shower"],"source":"Morning"}
+      ]
+    },
+    {
+      "name": "flag puts the gym before the shower",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "m": {
+            "id": "m",
+            "name": "Morning",
+            "steps": [
+              {"id":"wake","type":"task","title":"Wake","after":[]},
+              {"id":"gym","type":"task","title":"Gym","after":[{"id":"wake"}],"when":"gym"},
+              {"id":"shower","type":"task","title":"Shower","after":[{"id":"wake"},{"id":"gym"}]},
+              {"id":"dress","type":"task","title":"Dress","after":[{"id":"shower"}]}
+            ]
+          }
+        },
+        "root": "m",
+        "flags": {"gym":true}
+      },
+      "expected": [
+        {"id":"wake","title":"Wake","deps":[],"source":"Morning"},
+        {"id":"gym","title":"Gym","deps":["wake"],"source":"Morning"},
+        {"id":"shower","title":"Shower","deps":["wake","gym"],"source":"Morning"},
+        {"id":"dress","title":"Dress","deps":["shower"],"source":"Morning"}
+      ]
+    },
+    {
+      "name": "negated condition, flag off",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[],"when":"!rain"},
+              {"id":"b","type":"task","title":"B","after":[{"id":"a"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"a","title":"A","deps":[],"source":"R"},
+        {"id":"b","title":"B","deps":["a"],"source":"R"}
+      ]
+    },
+    {
+      "name": "negated condition, flag on",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[],"when":"!rain"},
+              {"id":"b","type":"task","title":"B","after":[{"id":"a"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {"rain":true}
+      },
+      "expected": [{"id":"b","title":"B","deps":[],"source":"R"}]
+    },
+    {
+      "name": "conditional edge, off",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[]},
+              {"id":"b","type":"task","title":"B","after":[]},
+              {"id":"c","type":"task","title":"C","after":[{"id":"a"},{"id":"b","when":"late"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"a","title":"A","deps":[],"source":"R"},
+        {"id":"b","title":"B","deps":[],"source":"R"},
+        {"id":"c","title":"C","deps":["a"],"source":"R"}
+      ]
+    },
+    {
+      "name": "conditional edge, on",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[]},
+              {"id":"b","type":"task","title":"B","after":[]},
+              {"id":"c","type":"task","title":"C","after":[{"id":"a"},{"id":"b","when":"late"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {"late":true}
+      },
+      "expected": [
+        {"id":"a","title":"A","deps":[],"source":"R"},
+        {"id":"b","title":"B","deps":[],"source":"R"},
+        {"id":"c","title":"C","deps":["a","b"],"source":"R"}
+      ]
+    },
+    {
+      "name": "sub-routines are spliced in between their neighbours",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "bf": {
+            "id": "bf",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Coffee","after":[]},
+              {"id":"food","type":"task","title":"Food","after":[]},
+              {"id":"eat","type":"task","title":"Eat","after":[{"id":"coffee"},{"id":"food"}]}
+            ]
+          },
+          "d": {
+            "id": "d",
+            "name": "Day",
+            "steps": [
+              {"id":"dress","type":"task","title":"Dress","after":[]},
+              {"id":"bf","type":"routine","routineId":"bf","after":[{"id":"dress"}]},
+              {"id":"leave","type":"task","title":"Leave","after":[{"id":"bf"}]}
+            ]
+          }
+        },
+        "root": "d",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"dress","title":"Dress","deps":[],"source":"Day"},
+        {"id":"bf/coffee","title":"Coffee","deps":["dress"],"source":"Breakfast"},
+        {"id":"bf/food","title":"Food","deps":["dress"],"source":"Breakfast"},
+        {"id":"bf/eat","title":"Eat","deps":["bf/coffee","bf/food"],"source":"Breakfast"},
+        {"id":"leave","title":"Leave","deps":["bf/eat"],"source":"Day"}
+      ]
+    },
+    {
+      "name": "the same routine can be included twice",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "x": {"id":"x","name":"X","steps":[{"id":"a","type":"task","title":"A","after":[]}]},
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"one","type":"routine","routineId":"x","after":[]},
+              {"id":"two","type":"routine","routineId":"x","after":[{"id":"one"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"one/a","title":"A","deps":[],"source":"X"},
+        {"id":"two/a","title":"A","deps":["one/a"],"source":"X"}
+      ]
+    },
+    {
+      "name": "the same routine twice side by side, then joined",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "bf": {
+            "id": "bf",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Coffee","after":[]},
+              {"id":"food","type":"task","title":"Food","after":[]},
+              {"id":"eat","type":"task","title":"Eat","after":[{"id":"coffee"},{"id":"food"}]}
+            ]
+          },
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"up","type":"task","title":"Up","after":[]},
+              {"id":"a","type":"routine","routineId":"bf","after":[{"id":"up"}]},
+              {"id":"b","type":"routine","routineId":"bf","after":[{"id":"up"}]},
+              {"id":"done","type":"task","title":"Done","after":[{"id":"a"},{"id":"b"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"up","title":"Up","deps":[],"source":"R"},
+        {"id":"a/coffee","title":"Coffee","deps":["up"],"source":"Breakfast"},
+        {"id":"a/food","title":"Food","deps":["up"],"source":"Breakfast"},
+        {"id":"a/eat","title":"Eat","deps":["a/coffee","a/food"],"source":"Breakfast"},
+        {"id":"b/coffee","title":"Coffee","deps":["up"],"source":"Breakfast"},
+        {"id":"b/food","title":"Food","deps":["up"],"source":"Breakfast"},
+        {"id":"b/eat","title":"Eat","deps":["b/coffee","b/food"],"source":"Breakfast"},
+        {"id":"done","title":"Done","deps":["a/eat","b/eat"],"source":"R"}
+      ]
+    },
+    {
+      "name": "hidden sub-routine contents are bridged",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "x": {
+            "id": "x",
+            "name": "X",
+            "steps": [{"id":"a","type":"task","title":"A","after":[],"when":"never"}]
+          },
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"s","type":"task","title":"S","after":[]},
+              {"id":"x","type":"routine","routineId":"x","after":[{"id":"s"}]},
+              {"id":"e","type":"task","title":"E","after":[{"id":"x"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"s","title":"S","deps":[],"source":"R"},
+        {"id":"e","title":"E","deps":["s"],"source":"R"}
+      ]
+    },
+    {
+      "name": "empty sub-routine is bridged",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "x": {"id":"x","name":"X","steps":[]},
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"s","type":"task","title":"S","after":[]},
+              {"id":"x","type":"routine","routineId":"x","after":[{"id":"s"}]},
+              {"id":"e","type":"task","title":"E","after":[{"id":"x"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"s","title":"S","deps":[],"source":"R"},
+        {"id":"e","title":"E","deps":["s"],"source":"R"}
+      ]
+    },
+    {
+      "name": "a hidden sub-routine step is bridged",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "bf": {
+            "id": "bf",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Coffee","after":[]},
+              {"id":"food","type":"task","title":"Food","after":[]},
+              {"id":"eat","type":"task","title":"Eat","after":[{"id":"coffee"},{"id":"food"}]}
+            ]
+          },
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"s","type":"task","title":"S","after":[]},
+              {"id":"bf","type":"routine","routineId":"bf","after":[{"id":"s"}],"when":"hungry"},
+              {"id":"e","type":"task","title":"E","after":[{"id":"bf"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"s","title":"S","deps":[],"source":"R"},
+        {"id":"e","title":"E","deps":["s"],"source":"R"}
+      ]
+    },
+    {
+      "name": "nested sub-routines get nested ids",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "c": {
+            "id": "c",
+            "name": "Inner",
+            "steps": [
+              {"id":"x","type":"task","title":"X","after":[]},
+              {"id":"y","type":"task","title":"Y","after":[{"id":"x"}]}
+            ]
+          },
+          "b": {
+            "id": "b",
+            "name": "Middle",
+            "steps": [
+              {"id":"p","type":"task","title":"P","after":[]},
+              {"id":"in","type":"routine","routineId":"c","after":[{"id":"p"}]},
+              {"id":"q","type":"task","title":"Q","after":[{"id":"in"}]}
+            ]
+          },
+          "a": {
+            "id": "a",
+            "name": "Outer",
+            "steps": [
+              {"id":"start","type":"task","title":"Start","after":[]},
+              {"id":"mid","type":"routine","routineId":"b","after":[{"id":"start"}]},
+              {"id":"end","type":"task","title":"End","after":[{"id":"mid"}]}
+            ]
+          }
+        },
+        "root": "a",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"start","title":"Start","deps":[],"source":"Outer"},
+        {"id":"mid/p","title":"P","deps":["start"],"source":"Middle"},
+        {"id":"mid/in/x","title":"X","deps":["mid/p"],"source":"Inner"},
+        {"id":"mid/in/y","title":"Y","deps":["mid/in/x"],"source":"Inner"},
+        {"id":"mid/q","title":"Q","deps":["mid/in/y"],"source":"Middle"},
+        {"id":"end","title":"End","deps":["mid/q"],"source":"Outer"}
+      ]
+    },
+    {
+      "name": "a sub-routine first in its routine has first steps waiting on nothing",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "bf": {
+            "id": "bf",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Coffee","after":[]},
+              {"id":"food","type":"task","title":"Food","after":[]},
+              {"id":"eat","type":"task","title":"Eat","after":[{"id":"coffee"},{"id":"food"}]}
+            ]
+          },
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"bf","type":"routine","routineId":"bf","after":[]},
+              {"id":"after","type":"task","title":"After","after":[{"id":"bf"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"bf/coffee","title":"Coffee","deps":[],"source":"Breakfast"},
+        {"id":"bf/food","title":"Food","deps":[],"source":"Breakfast"},
+        {"id":"bf/eat","title":"Eat","deps":["bf/coffee","bf/food"],"source":"Breakfast"},
+        {"id":"after","title":"After","deps":["bf/eat"],"source":"R"}
+      ]
+    },
+    {
+      "name": "routine whose steps are all hidden",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[],"when":"x"},
+              {"id":"b","type":"task","title":"B","after":[{"id":"a"}],"when":"y"}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": []
+    },
+    {
+      "name": "routine with no steps",
+      "fn": "expand",
+      "input": {"routines":{"r":{"id":"r","name":"R","steps":[]}},"root":"r","flags":{}},
+      "expected": []
+    },
+    {
+      "name": "a hidden step between several prerequisites and several dependents",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[]},
+              {"id":"b","type":"task","title":"B","after":[]},
+              {"id":"mid","type":"task","title":"Mid","after":[{"id":"a"},{"id":"b"}],"when":"x"},
+              {"id":"c","type":"task","title":"C","after":[{"id":"mid"}]},
+              {"id":"d","type":"task","title":"D","after":[{"id":"mid"},{"id":"a"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"a","title":"A","deps":[],"source":"R"},
+        {"id":"b","title":"B","deps":[],"source":"R"},
+        {"id":"c","title":"C","deps":["a","b"],"source":"R"},
+        {"id":"d","title":"D","deps":["a","b"],"source":"R"}
+      ]
+    },
+    {
+      "name": "bridged prerequisites are not repeated",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"x","type":"task","title":"X","after":[]},
+              {"id":"a","type":"task","title":"A","after":[{"id":"x"}],"when":"no"},
+              {"id":"b","type":"task","title":"B","after":[{"id":"x"}],"when":"no"},
+              {"id":"c","type":"task","title":"C","after":[{"id":"a"},{"id":"b"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"x","title":"X","deps":[],"source":"R"},
+        {"id":"c","title":"C","deps":["x"],"source":"R"}
+      ]
+    },
+    {
+      "name": "steps come out after their prerequisites, whatever the listed order",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"c","type":"task","title":"C","after":[{"id":"b"}]},
+              {"id":"b","type":"task","title":"B","after":[{"id":"a"}]},
+              {"id":"a","type":"task","title":"A","after":[]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"a","title":"A","deps":[],"source":"R"},
+        {"id":"b","title":"B","deps":["a"],"source":"R"},
+        {"id":"c","title":"C","deps":["b"],"source":"R"}
+      ]
+    },
+    {
+      "name": "an edge to a step that no longer exists is ignored",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[]},
+              {"id":"b","type":"task","title":"B","after":[{"id":"a"},{"id":"gone"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"a","title":"A","deps":[],"source":"R"},
+        {"id":"b","title":"B","deps":["a"],"source":"R"}
+      ]
+    },
+    {
+      "name": "a step whose only prerequisite no longer exists waits on what the routine waits on",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "x": {
+            "id": "x",
+            "name": "X",
+            "steps": [{"id":"a","type":"task","title":"A","after":[{"id":"gone"}]}]
+          },
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"s","type":"task","title":"S","after":[]},
+              {"id":"x","type":"routine","routineId":"x","after":[{"id":"s"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"s","title":"S","deps":[],"source":"R"},
+        {"id":"x/a","title":"A","deps":["s"],"source":"X"}
+      ]
+    },
+    {
+      "name": "all prerequisites conditional and off, inside a sub-routine",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "x": {
+            "id": "x",
+            "name": "X",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[]},
+              {"id":"b","type":"task","title":"B","after":[{"id":"a","when":"late"}]}
+            ]
+          },
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"s","type":"task","title":"S","after":[]},
+              {"id":"x","type":"routine","routineId":"x","after":[{"id":"s"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"s","title":"S","deps":[],"source":"R"},
+        {"id":"x/a","title":"A","deps":["s"],"source":"X"},
+        {"id":"x/b","title":"B","deps":["s"],"source":"X"}
+      ]
+    },
+    {
+      "name": "a conditional edge into a sub-routine step",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "bf": {
+            "id": "bf",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Coffee","after":[]},
+              {"id":"food","type":"task","title":"Food","after":[]},
+              {"id":"eat","type":"task","title":"Eat","after":[{"id":"coffee"},{"id":"food"}]}
+            ]
+          },
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"s","type":"task","title":"S","after":[]},
+              {"id":"t","type":"task","title":"T","after":[]},
+              {
+                "id": "bf",
+                "type": "routine",
+                "routineId": "bf",
+                "after": [{"id":"s"},{"id":"t","when":"tea"}]
+              }
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {"tea":true}
+      },
+      "expected": [
+        {"id":"s","title":"S","deps":[],"source":"R"},
+        {"id":"t","title":"T","deps":[],"source":"R"},
+        {"id":"bf/coffee","title":"Coffee","deps":["s","t"],"source":"Breakfast"},
+        {"id":"bf/food","title":"Food","deps":["s","t"],"source":"Breakfast"},
+        {"id":"bf/eat","title":"Eat","deps":["bf/coffee","bf/food"],"source":"Breakfast"}
+      ]
+    },
+    {
+      "name": "empty and missing titles",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"a","type":"task","title":"","after":[]},
+              {"id":"b","type":"task","after":[{"id":"a"}]}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"a","title":"(untitled)","deps":[],"source":"R"},
+        {"id":"b","title":"(untitled)","deps":["a"],"source":"R"}
+      ]
+    },
+    {
+      "name": "a condition with capitals",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [{"id":"a","type":"task","title":"A","after":[],"when":"Gym"}]
+          }
+        },
+        "root": "r",
+        "flags": {"gym":true}
+      },
+      "expected": [{"id":"a","title":"A","deps":[],"source":"R"}]
+    },
+    {
+      "name": "seed Morning, no flags",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "breakfast": {
+            "id": "breakfast",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Start the coffee","when":"","after":[]},
+              {"id":"food","type":"task","title":"Make food","when":"","after":[]},
+              {
+                "id": "eat",
+                "type": "task",
+                "title": "Eat",
+                "when": "",
+                "after": [{"id":"coffee"},{"id":"food"}]
+              },
+              {"id":"clean","type":"task","title":"Clean up","when":"","after":[{"id":"eat"}]}
+            ]
+          },
+          "morning": {
+            "id": "morning",
+            "name": "Morning",
+            "steps": [
+              {"id":"wake","type":"task","title":"Get out of bed","when":"","after":[]},
+              {
+                "id": "water",
+                "type": "task",
+                "title": "Drink a glass of water",
+                "when": "",
+                "after": [{"id":"wake"}]
+              },
+              {"id":"gym","type":"task","title":"Gym session","when":"gym","after":[{"id":"water"}]},
+              {
+                "id": "shower",
+                "type": "task",
+                "title": "Shower",
+                "when": "",
+                "after": [{"id":"wake"},{"id":"gym"}]
+              },
+              {"id":"teeth","type":"task","title":"Brush teeth","when":"","after":[{"id":"shower"}]},
+              {"id":"dress","type":"task","title":"Get dressed","when":"","after":[{"id":"teeth"}]},
+              {
+                "id": "bf",
+                "type": "routine",
+                "routineId": "breakfast",
+                "when": "",
+                "after": [{"id":"dress"}]
+              },
+              {"id":"meds","type":"task","title":"Take vitamins","when":"","after":[{"id":"bf"}]}
+            ]
+          },
+          "travel": {
+            "id": "travel",
+            "name": "Travel",
+            "steps": [
+              {"id":"checkin","type":"task","title":"Check in online","when":"flying","after":[]},
+              {"id":"passport","type":"task","title":"Passport","when":"abroad","after":[]},
+              {"id":"adapter","type":"task","title":"Power adapter","when":"abroad","after":[]},
+              {"id":"clothes","type":"task","title":"Clothes","when":"","after":[]},
+              {
+                "id": "toiletries",
+                "type": "task",
+                "title": "Toiletries",
+                "when": "",
+                "after": [{"id":"clothes"}]
+              },
+              {"id":"charger","type":"task","title":"Phone charger","when":"","after":[]},
+              {
+                "id": "close",
+                "type": "task",
+                "title": "Pack the bag",
+                "when": "",
+                "after": [
+                  {"id":"passport"},
+                  {"id":"adapter"},
+                  {"id":"toiletries"},
+                  {"id":"charger"},
+                  {"id":"checkin"}
+                ]
+              },
+              {
+                "id": "lights",
+                "type": "task",
+                "title": "Lights off, windows shut",
+                "when": "",
+                "after": [{"id":"close"}]
+              },
+              {
+                "id": "lock",
+                "type": "task",
+                "title": "Lock the door",
+                "when": "",
+                "after": [{"id":"lights"}]
+              }
+            ]
+          }
+        },
+        "root": "morning",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"wake","title":"Get out of bed","deps":[],"source":"Morning"},
+        {"id":"water","title":"Drink a glass of water","deps":["wake"],"source":"Morning"},
+        {"id":"shower","title":"Shower","deps":["wake","water"],"source":"Morning"},
+        {"id":"teeth","title":"Brush teeth","deps":["shower"],"source":"Morning"},
+        {"id":"dress","title":"Get dressed","deps":["teeth"],"source":"Morning"},
+        {"id":"bf/coffee","title":"Start the coffee","deps":["dress"],"source":"Breakfast"},
+        {"id":"bf/food","title":"Make food","deps":["dress"],"source":"Breakfast"},
+        {"id":"bf/eat","title":"Eat","deps":["bf/coffee","bf/food"],"source":"Breakfast"},
+        {"id":"bf/clean","title":"Clean up","deps":["bf/eat"],"source":"Breakfast"},
+        {"id":"meds","title":"Take vitamins","deps":["bf/clean"],"source":"Morning"}
+      ]
+    },
+    {
+      "name": "seed Morning with gym",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "breakfast": {
+            "id": "breakfast",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Start the coffee","when":"","after":[]},
+              {"id":"food","type":"task","title":"Make food","when":"","after":[]},
+              {
+                "id": "eat",
+                "type": "task",
+                "title": "Eat",
+                "when": "",
+                "after": [{"id":"coffee"},{"id":"food"}]
+              },
+              {"id":"clean","type":"task","title":"Clean up","when":"","after":[{"id":"eat"}]}
+            ]
+          },
+          "morning": {
+            "id": "morning",
+            "name": "Morning",
+            "steps": [
+              {"id":"wake","type":"task","title":"Get out of bed","when":"","after":[]},
+              {
+                "id": "water",
+                "type": "task",
+                "title": "Drink a glass of water",
+                "when": "",
+                "after": [{"id":"wake"}]
+              },
+              {"id":"gym","type":"task","title":"Gym session","when":"gym","after":[{"id":"water"}]},
+              {
+                "id": "shower",
+                "type": "task",
+                "title": "Shower",
+                "when": "",
+                "after": [{"id":"wake"},{"id":"gym"}]
+              },
+              {"id":"teeth","type":"task","title":"Brush teeth","when":"","after":[{"id":"shower"}]},
+              {"id":"dress","type":"task","title":"Get dressed","when":"","after":[{"id":"teeth"}]},
+              {
+                "id": "bf",
+                "type": "routine",
+                "routineId": "breakfast",
+                "when": "",
+                "after": [{"id":"dress"}]
+              },
+              {"id":"meds","type":"task","title":"Take vitamins","when":"","after":[{"id":"bf"}]}
+            ]
+          },
+          "travel": {
+            "id": "travel",
+            "name": "Travel",
+            "steps": [
+              {"id":"checkin","type":"task","title":"Check in online","when":"flying","after":[]},
+              {"id":"passport","type":"task","title":"Passport","when":"abroad","after":[]},
+              {"id":"adapter","type":"task","title":"Power adapter","when":"abroad","after":[]},
+              {"id":"clothes","type":"task","title":"Clothes","when":"","after":[]},
+              {
+                "id": "toiletries",
+                "type": "task",
+                "title": "Toiletries",
+                "when": "",
+                "after": [{"id":"clothes"}]
+              },
+              {"id":"charger","type":"task","title":"Phone charger","when":"","after":[]},
+              {
+                "id": "close",
+                "type": "task",
+                "title": "Pack the bag",
+                "when": "",
+                "after": [
+                  {"id":"passport"},
+                  {"id":"adapter"},
+                  {"id":"toiletries"},
+                  {"id":"charger"},
+                  {"id":"checkin"}
+                ]
+              },
+              {
+                "id": "lights",
+                "type": "task",
+                "title": "Lights off, windows shut",
+                "when": "",
+                "after": [{"id":"close"}]
+              },
+              {
+                "id": "lock",
+                "type": "task",
+                "title": "Lock the door",
+                "when": "",
+                "after": [{"id":"lights"}]
+              }
+            ]
+          }
+        },
+        "root": "morning",
+        "flags": {"gym":true}
+      },
+      "expected": [
+        {"id":"wake","title":"Get out of bed","deps":[],"source":"Morning"},
+        {"id":"water","title":"Drink a glass of water","deps":["wake"],"source":"Morning"},
+        {"id":"gym","title":"Gym session","deps":["water"],"source":"Morning"},
+        {"id":"shower","title":"Shower","deps":["wake","gym"],"source":"Morning"},
+        {"id":"teeth","title":"Brush teeth","deps":["shower"],"source":"Morning"},
+        {"id":"dress","title":"Get dressed","deps":["teeth"],"source":"Morning"},
+        {"id":"bf/coffee","title":"Start the coffee","deps":["dress"],"source":"Breakfast"},
+        {"id":"bf/food","title":"Make food","deps":["dress"],"source":"Breakfast"},
+        {"id":"bf/eat","title":"Eat","deps":["bf/coffee","bf/food"],"source":"Breakfast"},
+        {"id":"bf/clean","title":"Clean up","deps":["bf/eat"],"source":"Breakfast"},
+        {"id":"meds","title":"Take vitamins","deps":["bf/clean"],"source":"Morning"}
+      ]
+    },
+    {
+      "name": "seed Travel, staying home",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "breakfast": {
+            "id": "breakfast",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Start the coffee","when":"","after":[]},
+              {"id":"food","type":"task","title":"Make food","when":"","after":[]},
+              {
+                "id": "eat",
+                "type": "task",
+                "title": "Eat",
+                "when": "",
+                "after": [{"id":"coffee"},{"id":"food"}]
+              },
+              {"id":"clean","type":"task","title":"Clean up","when":"","after":[{"id":"eat"}]}
+            ]
+          },
+          "morning": {
+            "id": "morning",
+            "name": "Morning",
+            "steps": [
+              {"id":"wake","type":"task","title":"Get out of bed","when":"","after":[]},
+              {
+                "id": "water",
+                "type": "task",
+                "title": "Drink a glass of water",
+                "when": "",
+                "after": [{"id":"wake"}]
+              },
+              {"id":"gym","type":"task","title":"Gym session","when":"gym","after":[{"id":"water"}]},
+              {
+                "id": "shower",
+                "type": "task",
+                "title": "Shower",
+                "when": "",
+                "after": [{"id":"wake"},{"id":"gym"}]
+              },
+              {"id":"teeth","type":"task","title":"Brush teeth","when":"","after":[{"id":"shower"}]},
+              {"id":"dress","type":"task","title":"Get dressed","when":"","after":[{"id":"teeth"}]},
+              {
+                "id": "bf",
+                "type": "routine",
+                "routineId": "breakfast",
+                "when": "",
+                "after": [{"id":"dress"}]
+              },
+              {"id":"meds","type":"task","title":"Take vitamins","when":"","after":[{"id":"bf"}]}
+            ]
+          },
+          "travel": {
+            "id": "travel",
+            "name": "Travel",
+            "steps": [
+              {"id":"checkin","type":"task","title":"Check in online","when":"flying","after":[]},
+              {"id":"passport","type":"task","title":"Passport","when":"abroad","after":[]},
+              {"id":"adapter","type":"task","title":"Power adapter","when":"abroad","after":[]},
+              {"id":"clothes","type":"task","title":"Clothes","when":"","after":[]},
+              {
+                "id": "toiletries",
+                "type": "task",
+                "title": "Toiletries",
+                "when": "",
+                "after": [{"id":"clothes"}]
+              },
+              {"id":"charger","type":"task","title":"Phone charger","when":"","after":[]},
+              {
+                "id": "close",
+                "type": "task",
+                "title": "Pack the bag",
+                "when": "",
+                "after": [
+                  {"id":"passport"},
+                  {"id":"adapter"},
+                  {"id":"toiletries"},
+                  {"id":"charger"},
+                  {"id":"checkin"}
+                ]
+              },
+              {
+                "id": "lights",
+                "type": "task",
+                "title": "Lights off, windows shut",
+                "when": "",
+                "after": [{"id":"close"}]
+              },
+              {
+                "id": "lock",
+                "type": "task",
+                "title": "Lock the door",
+                "when": "",
+                "after": [{"id":"lights"}]
+              }
+            ]
+          }
+        },
+        "root": "travel",
+        "flags": {"abroad":false,"flying":false}
+      },
+      "expected": [
+        {"id":"clothes","title":"Clothes","deps":[],"source":"Travel"},
+        {"id":"toiletries","title":"Toiletries","deps":["clothes"],"source":"Travel"},
+        {"id":"charger","title":"Phone charger","deps":[],"source":"Travel"},
+        {"id":"close","title":"Pack the bag","deps":["toiletries","charger"],"source":"Travel"},
+        {"id":"lights","title":"Lights off, windows shut","deps":["close"],"source":"Travel"},
+        {"id":"lock","title":"Lock the door","deps":["lights"],"source":"Travel"}
+      ]
+    },
+    {
+      "name": "seed Travel, flying abroad",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "breakfast": {
+            "id": "breakfast",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Start the coffee","when":"","after":[]},
+              {"id":"food","type":"task","title":"Make food","when":"","after":[]},
+              {
+                "id": "eat",
+                "type": "task",
+                "title": "Eat",
+                "when": "",
+                "after": [{"id":"coffee"},{"id":"food"}]
+              },
+              {"id":"clean","type":"task","title":"Clean up","when":"","after":[{"id":"eat"}]}
+            ]
+          },
+          "morning": {
+            "id": "morning",
+            "name": "Morning",
+            "steps": [
+              {"id":"wake","type":"task","title":"Get out of bed","when":"","after":[]},
+              {
+                "id": "water",
+                "type": "task",
+                "title": "Drink a glass of water",
+                "when": "",
+                "after": [{"id":"wake"}]
+              },
+              {"id":"gym","type":"task","title":"Gym session","when":"gym","after":[{"id":"water"}]},
+              {
+                "id": "shower",
+                "type": "task",
+                "title": "Shower",
+                "when": "",
+                "after": [{"id":"wake"},{"id":"gym"}]
+              },
+              {"id":"teeth","type":"task","title":"Brush teeth","when":"","after":[{"id":"shower"}]},
+              {"id":"dress","type":"task","title":"Get dressed","when":"","after":[{"id":"teeth"}]},
+              {
+                "id": "bf",
+                "type": "routine",
+                "routineId": "breakfast",
+                "when": "",
+                "after": [{"id":"dress"}]
+              },
+              {"id":"meds","type":"task","title":"Take vitamins","when":"","after":[{"id":"bf"}]}
+            ]
+          },
+          "travel": {
+            "id": "travel",
+            "name": "Travel",
+            "steps": [
+              {"id":"checkin","type":"task","title":"Check in online","when":"flying","after":[]},
+              {"id":"passport","type":"task","title":"Passport","when":"abroad","after":[]},
+              {"id":"adapter","type":"task","title":"Power adapter","when":"abroad","after":[]},
+              {"id":"clothes","type":"task","title":"Clothes","when":"","after":[]},
+              {
+                "id": "toiletries",
+                "type": "task",
+                "title": "Toiletries",
+                "when": "",
+                "after": [{"id":"clothes"}]
+              },
+              {"id":"charger","type":"task","title":"Phone charger","when":"","after":[]},
+              {
+                "id": "close",
+                "type": "task",
+                "title": "Pack the bag",
+                "when": "",
+                "after": [
+                  {"id":"passport"},
+                  {"id":"adapter"},
+                  {"id":"toiletries"},
+                  {"id":"charger"},
+                  {"id":"checkin"}
+                ]
+              },
+              {
+                "id": "lights",
+                "type": "task",
+                "title": "Lights off, windows shut",
+                "when": "",
+                "after": [{"id":"close"}]
+              },
+              {
+                "id": "lock",
+                "type": "task",
+                "title": "Lock the door",
+                "when": "",
+                "after": [{"id":"lights"}]
+              }
+            ]
+          }
+        },
+        "root": "travel",
+        "flags": {"abroad":true,"flying":true}
+      },
+      "expected": [
+        {"id":"checkin","title":"Check in online","deps":[],"source":"Travel"},
+        {"id":"passport","title":"Passport","deps":[],"source":"Travel"},
+        {"id":"adapter","title":"Power adapter","deps":[],"source":"Travel"},
+        {"id":"clothes","title":"Clothes","deps":[],"source":"Travel"},
+        {"id":"toiletries","title":"Toiletries","deps":["clothes"],"source":"Travel"},
+        {"id":"charger","title":"Phone charger","deps":[],"source":"Travel"},
+        {
+          "id": "close",
+          "title": "Pack the bag",
+          "deps": ["passport","adapter","toiletries","charger","checkin"],
+          "source": "Travel"
+        },
+        {"id":"lights","title":"Lights off, windows shut","deps":["close"],"source":"Travel"},
+        {"id":"lock","title":"Lock the door","deps":["lights"],"source":"Travel"}
+      ]
+    },
+    {
+      "name": "circular dependency is rejected",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "c": {
+            "id": "c",
+            "name": "C",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[{"id":"b"}]},
+              {"id":"b","type":"task","title":"B","after":[{"id":"a"}]}
+            ]
+          }
+        },
+        "root": "c",
+        "flags": {}
+      },
+      "expected": {"error":"Circular dependency in \"C\""}
+    },
+    {
+      "name": "a step waiting on itself is rejected",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "c": {
+            "id": "c",
+            "name": "C",
+            "steps": [{"id":"a","type":"task","title":"A","after":[{"id":"a"}]}]
+          }
+        },
+        "root": "c",
+        "flags": {}
+      },
+      "expected": {"error":"Circular dependency in \"C\""}
+    },
+    {
+      "name": "a loop among hidden steps is still rejected",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "c": {
+            "id": "c",
+            "name": "C",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[{"id":"b"}],"when":"x"},
+              {"id":"b","type":"task","title":"B","after":[{"id":"a"}],"when":"x"}
+            ]
+          }
+        },
+        "root": "c",
+        "flags": {}
+      },
+      "expected": {"error":"Circular dependency in \"C\""}
+    },
+    {
+      "name": "a loop through an edge that is off is allowed",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "c": {
+            "id": "c",
+            "name": "C",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[{"id":"b","when":"x"}]},
+              {"id":"b","type":"task","title":"B","after":[{"id":"a"}]}
+            ]
+          }
+        },
+        "root": "c",
+        "flags": {}
+      },
+      "expected": [
+        {"id":"a","title":"A","deps":[],"source":"C"},
+        {"id":"b","title":"B","deps":["a"],"source":"C"}
+      ]
+    },
+    {
+      "name": "a loop inside a sub-routine names the sub-routine",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "c": {
+            "id": "c",
+            "name": "Loop",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[{"id":"b"}]},
+              {"id":"b","type":"task","title":"B","after":[{"id":"a"}]}
+            ]
+          },
+          "r": {
+            "id": "r",
+            "name": "Outer",
+            "steps": [{"id":"c","type":"routine","routineId":"c","after":[]}]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": {"error":"Circular dependency in \"Loop\""}
+    },
+    {
+      "name": "self-inclusion is rejected",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "s": {
+            "id": "s",
+            "name": "S",
+            "steps": [{"id":"me","type":"routine","routineId":"s","after":[]}]
+          }
+        },
+        "root": "s",
+        "flags": {}
+      },
+      "expected": {"error":"\"S\" includes itself"}
+    },
+    {
+      "name": "inclusion through another routine is rejected",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "a": {
+            "id": "a",
+            "name": "A",
+            "steps": [{"id":"b","type":"routine","routineId":"b","after":[]}]
+          },
+          "b": {
+            "id": "b",
+            "name": "B",
+            "steps": [{"id":"a","type":"routine","routineId":"a","after":[]}]
+          }
+        },
+        "root": "a",
+        "flags": {}
+      },
+      "expected": {"error":"\"A\" includes itself"}
+    },
+    {
+      "name": "a hidden self-inclusion is allowed",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "s": {
+            "id": "s",
+            "name": "S",
+            "steps": [
+              {"id":"x","type":"task","title":"X","after":[]},
+              {"id":"me","type":"routine","routineId":"s","after":[],"when":"never"}
+            ]
+          }
+        },
+        "root": "s",
+        "flags": {}
+      },
+      "expected": [{"id":"x","title":"X","deps":[],"source":"S"}]
+    },
+    {
+      "name": "missing routine",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "x": {"id":"x","name":"X","steps":[{"id":"a","type":"task","title":"A","after":[]}]}
+        },
+        "root": "gone",
+        "flags": {}
+      },
+      "expected": {"error":"A sub-routine no longer exists"}
+    },
+    {
+      "name": "missing sub-routine",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [{"id":"s","type":"routine","routineId":"gone","after":[]}]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": {"error":"A sub-routine no longer exists"}
+    },
+    {
+      "name": "a hidden step pointing at a missing sub-routine is fine",
+      "fn": "expand",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[]},
+              {"id":"s","type":"routine","routineId":"gone","after":[{"id":"a"}],"when":"x"}
+            ]
+          }
+        },
+        "root": "r",
+        "flags": {}
+      },
+      "expected": [{"id":"a","title":"A","deps":[],"source":"R"}]
+    }
+  ]
+}
