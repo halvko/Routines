@@ -1,0 +1,22 @@
+# THROWAWAY prototype for issue #3. Not the real server.
+name = "routines-prototype"
+main = "build/index.js"
+compatibility_date = "2026-10-01"
+# CIMD fetches a client-supplied URL; this keeps fetch() off private addresses.
+compatibility_flags = ["global_fetch_strictly_public"]
+
+[build]
+command = "./patch-webauthn.sh && worker-build --release"
+
+[durable_objects]
+bindings = [
+  { name = "USER", class_name = "UserObject" },
+  { name = "DIRECTORY", class_name = "Directory" },
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["UserObject", "Directory"]
+
+[observability]
+enabled = true
