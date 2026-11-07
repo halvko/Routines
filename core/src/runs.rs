@@ -191,13 +191,12 @@ pub fn is_finished(run: &Run) -> bool {
 /// Would the current placements make steps across runs wait on each other in
 /// a loop?
 pub fn has_cycle(runs: &Runs) -> bool {
-    let links = cross_links(runs);
-    let nodes = index(runs);
+    let ctx = Ctx::new(runs);
     let mut state = HashMap::new();
     runs.values().any(|r| {
         r.nodes
             .iter()
-            .any(|n| visit(&nodes, &links, &mut state, &r.id, &n.id))
+            .any(|n| visit(&ctx, &mut state, &r.id, &n.id))
     })
 }
 
@@ -208,8 +207,7 @@ enum Visit {
 }
 
 fn visit<'a>(
-    nodes: &Index<'a>,
-    links: &'a Links,
+    ctx: &'a Ctx<'a>,
     state: &mut HashMap<(&'a str, &'a str), Visit>,
     run_id: &'a str,
     node_id: &'a str,
@@ -221,12 +219,14 @@ fn visit<'a>(
         None => {}
     }
     state.insert(k, Visit::InProgress);
-    let own = nodes
+    let own = ctx
+        .nodes
         .get(run_id)
         .and_then(|(_, steps)| steps.get(node_id))
         .map(|n| n.deps.as_slice())
         .unwrap_or_default();
-    let ext = links
+    let ext = ctx
+        .links
         .get(&Key(run_id, node_id))
         .map_or(&[][..], Vec::as_slice);
     let deps = own
@@ -235,7 +235,7 @@ fn visit<'a>(
         .chain(ext.iter().map(|x| (x.run.as_str(), x.id.as_str())));
     let mut cyc = false;
     for (r, id) in deps {
-        if nodes.contains_key(r) && visit(nodes, links, state, r, id) {
+        if ctx.nodes.contains_key(r) && visit(ctx, state, r, id) {
             cyc = true;
             break;
         }
