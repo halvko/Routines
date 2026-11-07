@@ -42,14 +42,16 @@ the move is a step of its own, built before the old address is retired:
    add the new icon to the home screen and remove the old one. It also offers
    **"Keep using this app"**, which unfreezes it with its local data intact,
    for when the new app lets the owner down that morning. The move can then be
-   retried. `routines.v1` is a bare snapshot (no per-field timestamps, no run
-   events, hard deletes), so a second upload cannot simply be merged: the old
-   app keeps the snapshot it uploaded the first time, and a later upload sends
-   only the **difference against it**, turned into ordinary changes
-   timestamped by the old device (something missing since then becomes a
-   delete, which per 0003 is a status change). Where the new app changed the
-   same thing since the first upload, timing does not decide: the conflict is
-   shown to the user to resolve (0003).
+   retried. The old app always sends its **full snapshot** over the same
+   endpoint and stores nothing extra. `routines.v1` is a bare snapshot (no
+   per-field timestamps, no run events, hard deletes), so the **core on the
+   server** does the comparing: it keeps the snapshot it imported last, turns
+   the difference into ordinary changes (something missing since then becomes
+   a delete, which per 0003 is a status change), and after each successful
+   import that snapshot becomes the new base, so nothing is sent twice. Where
+   the new app changed the same thing since the last import, timing does not
+   decide: the conflict is shown to the user to resolve (0003). One import
+   path, written once in the core and testable without a browser.
 3. **Export → Import stays available** as the fallback when the upload is not
    possible.
 4. The github.io release stays up until every device has moved; only then is
