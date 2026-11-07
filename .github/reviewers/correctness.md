@@ -20,12 +20,24 @@ is the worst bug it can have.
   and say what still points at the deleted thing.
 - Runs are snapshots of a routine at start: editing the routine must not
   change a run already started.
-- The graph rules (`src/graph.js`): hidden steps bridge their prerequisites,
+- The graph rules (`src/graph.js`, and their Rust port in `core/src/`):
+  hidden steps bridge their prerequisites,
   sub-routines splice in between their neighbours, placements across runs
   never form a loop, a run finishes exactly when every step is done or
   skipped. Test the change against nested sub-routines, a routine whose
   steps are all hidden, the same routine included twice, and a run placed
   relative to a step that is already done.
+- The Rust core (`core/`) must behave exactly like `src/graph.js` until the
+  JavaScript is retired: same results, same order of steps and blockers,
+  same error messages. Look for differences the vectors would miss: a map
+  iterated in a different order (the core keeps stored order with
+  `IndexMap`; a `HashMap` there changes results), string handling (JavaScript
+  sorts and splits by UTF-16 and its own whitespace), a missing or empty
+  field treated differently from `undefined` or `''`.
+- The core's types (`core/src/types.rs`) mirror the stored JSON: every
+  field the app writes, optional where older data may lack it, and unknown
+  fields kept in `extra` so saving through the core drops nothing. A field
+  made required, renamed or retyped can make existing data fail to load.
 - Every value interpolated into HTML goes through `esc()`.
 - The service worker (`sw.js`): a new file the app loads must be in `SHELL`,
   and a change to any shell file needs the cache version bumped, or phones

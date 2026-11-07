@@ -9,6 +9,7 @@ product's source of truth and roadmap.
 Always run:
 ```
 npm run check        # unit tests + browser tests
+cd core && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 ```
 When a change adds or changes a screen, add or update its case in
 `test/visual/screens.spec.js` and look at `npm run screenshots` output
@@ -25,7 +26,11 @@ When a change adds or changes a screen, add or update its case in
 - **No `confirm()`/`alert()`**: unreliable in home-screen apps on iOS. Act at
   once and offer Undo (`undoable()` in `src/app.js`).
 - Every value put into HTML goes through `esc()`.
-- Domain rules belong in `src/graph.js` (no DOM), not in `src/app.js`.
+- Domain rules belong in `src/graph.js` (no DOM), not in `src/app.js`, and
+  in its Rust port in `core/`: change both, add a case to
+  `core/tests/vectors/*.json`, run `npm run vectors` to write its expected
+  result from the JavaScript, and check the diff. Both test suites run the
+  vectors.
 
 ## Workflow
 

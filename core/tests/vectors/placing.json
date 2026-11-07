@@ -1,0 +1,882 @@
+{
+  "about": "crossLinks, hasCycle, and ready/waiting with runs placed before or after steps of other runs.",
+  "cases": [
+    {
+      "name": "after: links each first step to the other run's step",
+      "fn": "crossLinks",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"commute","title":"COMMUTE","deps":["wake"],"source":"x"},
+              {"id":"home","title":"HOME","deps":["commute"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000
+          },
+          "gym": {
+            "id": "gym",
+            "name": "GYM",
+            "flags": {},
+            "nodes": [
+              {"id":"unpack","title":"UNPACK","deps":[],"source":"x"},
+              {"id":"wash","title":"WASH","deps":["unpack"],"source":"x"},
+              {"id":"bottle","title":"BOTTLE","deps":[],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"day","id":"commute"}
+          }
+        }
+      },
+      "expected": [
+        {"run":"gym","id":"unpack","from":[{"run":"day","id":"commute"}]},
+        {"run":"gym","id":"bottle","from":[{"run":"day","id":"commute"}]}
+      ]
+    },
+    {
+      "name": "before: links the other run's step to each last step",
+      "fn": "crossLinks",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"leave","title":"LEAVE","deps":["wake"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000
+          },
+          "pack": {
+            "id": "pack",
+            "name": "PACK",
+            "flags": {},
+            "nodes": [
+              {"id":"shoes","title":"SHOES","deps":[],"source":"x"},
+              {"id":"towel","title":"TOWEL","deps":[],"source":"x"},
+              {"id":"close","title":"CLOSE","deps":["shoes","towel"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"before","run":"day","id":"leave"}
+          }
+        }
+      },
+      "expected": [{"run":"day","id":"leave","from":[{"run":"pack","id":"close"}]}]
+    },
+    {
+      "name": "two runs placed before the same step",
+      "fn": "crossLinks",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"leave","title":"LEAVE","deps":["wake"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000
+          },
+          "pack": {
+            "id": "pack",
+            "name": "PACK",
+            "flags": {},
+            "nodes": [
+              {"id":"shoes","title":"SHOES","deps":[],"source":"x"},
+              {"id":"towel","title":"TOWEL","deps":[],"source":"x"},
+              {"id":"close","title":"CLOSE","deps":["shoes","towel"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"before","run":"day","id":"leave"}
+          },
+          "bag": {
+            "id": "bag",
+            "name": "BAG",
+            "flags": {},
+            "nodes": [{"id":"zip","title":"ZIP","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"before","run":"day","id":"leave"}
+          }
+        }
+      },
+      "expected": [
+        {"run":"day","id":"leave","from":[{"run":"pack","id":"close"},{"run":"bag","id":"zip"}]}
+      ]
+    },
+    {
+      "name": "placement relative to a deleted run makes no link",
+      "fn": "crossLinks",
+      "input": {
+        "runs": {
+          "t": {
+            "id": "t",
+            "name": "T",
+            "flags": {},
+            "nodes": [{"id":"call","title":"CALL","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"gone","id":"x"}
+          }
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "placement relative to a missing step still makes a link",
+      "fn": "crossLinks",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"commute","title":"COMMUTE","deps":["wake"],"source":"x"},
+              {"id":"home","title":"HOME","deps":["commute"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000
+          },
+          "t": {
+            "id": "t",
+            "name": "T",
+            "flags": {},
+            "nodes": [{"id":"call","title":"CALL","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"day","id":"gone"}
+          }
+        }
+      },
+      "expected": [{"run":"t","id":"call","from":[{"run":"day","id":"gone"}]}]
+    },
+    {
+      "name": "no placements, no links",
+      "fn": "crossLinks",
+      "input": {
+        "runs": {
+          "r0": {
+            "id": "r0",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"commute","title":"COMMUTE","deps":["wake"],"source":"x"},
+              {"id":"home","title":"HOME","deps":["commute"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000
+          },
+          "r1": {
+            "id": "r1",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"leave","title":"LEAVE","deps":["wake"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000
+          }
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "after: nothing is ready until the step is done",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"commute","title":"COMMUTE","deps":["wake"],"source":"x"},
+              {"id":"home","title":"HOME","deps":["commute"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000
+          },
+          "gym": {
+            "id": "gym",
+            "name": "GYM",
+            "flags": {},
+            "nodes": [
+              {"id":"unpack","title":"UNPACK","deps":[],"source":"x"},
+              {"id":"wash","title":"WASH","deps":["unpack"],"source":"x"},
+              {"id":"bottle","title":"BOTTLE","deps":[],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"day","id":"commute"}
+          }
+        },
+        "run": "gym",
+        "placed": true
+      },
+      "expected": []
+    },
+    {
+      "name": "after: first steps wait on the other run, later ones only on their own",
+      "fn": "waiting",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"commute","title":"COMMUTE","deps":["wake"],"source":"x"},
+              {"id":"home","title":"HOME","deps":["commute"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000
+          },
+          "gym": {
+            "id": "gym",
+            "name": "GYM",
+            "flags": {},
+            "nodes": [
+              {"id":"unpack","title":"UNPACK","deps":[],"source":"x"},
+              {"id":"wash","title":"WASH","deps":["unpack"],"source":"x"},
+              {"id":"bottle","title":"BOTTLE","deps":[],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"day","id":"commute"}
+          }
+        },
+        "run": "gym",
+        "placed": true
+      },
+      "expected": [
+        {
+          "id": "unpack",
+          "title": "UNPACK",
+          "deps": [],
+          "source": "x",
+          "blockedBy": [],
+          "blockedExt": [{"run":"day","id":"commute"}]
+        },
+        {
+          "id": "wash",
+          "title": "WASH",
+          "deps": ["unpack"],
+          "source": "x",
+          "blockedBy": ["unpack"],
+          "blockedExt": []
+        },
+        {
+          "id": "bottle",
+          "title": "BOTTLE",
+          "deps": [],
+          "source": "x",
+          "blockedBy": [],
+          "blockedExt": [{"run":"day","id":"commute"}]
+        }
+      ]
+    },
+    {
+      "name": "after: ready once the step is done",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"commute","title":"COMMUTE","deps":["wake"],"source":"x"},
+              {"id":"home","title":"HOME","deps":["commute"],"source":"x"}
+            ],
+            "done": {"wake":"done","commute":"done"},
+            "startedAt": 1700000000000
+          },
+          "gym": {
+            "id": "gym",
+            "name": "GYM",
+            "flags": {},
+            "nodes": [
+              {"id":"unpack","title":"UNPACK","deps":[],"source":"x"},
+              {"id":"wash","title":"WASH","deps":["unpack"],"source":"x"},
+              {"id":"bottle","title":"BOTTLE","deps":[],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"day","id":"commute"}
+          }
+        },
+        "run": "gym",
+        "placed": true
+      },
+      "expected": [
+        {"id":"unpack","title":"UNPACK","deps":[],"source":"x"},
+        {"id":"bottle","title":"BOTTLE","deps":[],"source":"x"}
+      ]
+    },
+    {
+      "name": "after: ready once the step is dropped",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"commute","title":"COMMUTE","deps":["wake"],"source":"x"},
+              {"id":"home","title":"HOME","deps":["commute"],"source":"x"}
+            ],
+            "done": {"wake":"done","commute":"skipped"},
+            "startedAt": 1700000000000
+          },
+          "gym": {
+            "id": "gym",
+            "name": "GYM",
+            "flags": {},
+            "nodes": [
+              {"id":"unpack","title":"UNPACK","deps":[],"source":"x"},
+              {"id":"wash","title":"WASH","deps":["unpack"],"source":"x"},
+              {"id":"bottle","title":"BOTTLE","deps":[],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"day","id":"commute"}
+          }
+        },
+        "run": "gym",
+        "placed": true
+      },
+      "expected": [
+        {"id":"unpack","title":"UNPACK","deps":[],"source":"x"},
+        {"id":"bottle","title":"BOTTLE","deps":[],"source":"x"}
+      ]
+    },
+    {
+      "name": "after a step that is already done",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"commute","title":"COMMUTE","deps":["wake"],"source":"x"},
+              {"id":"home","title":"HOME","deps":["commute"],"source":"x"}
+            ],
+            "done": {"wake":"done","commute":"done","home":"done"},
+            "startedAt": 1700000000000
+          },
+          "gym": {
+            "id": "gym",
+            "name": "GYM",
+            "flags": {},
+            "nodes": [
+              {"id":"unpack","title":"UNPACK","deps":[],"source":"x"},
+              {"id":"wash","title":"WASH","deps":["unpack"],"source":"x"},
+              {"id":"bottle","title":"BOTTLE","deps":[],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"day","id":"commute"}
+          }
+        },
+        "run": "gym",
+        "placed": true
+      },
+      "expected": [
+        {"id":"unpack","title":"UNPACK","deps":[],"source":"x"},
+        {"id":"bottle","title":"BOTTLE","deps":[],"source":"x"}
+      ]
+    },
+    {
+      "name": "after a step that is not in the other run",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"commute","title":"COMMUTE","deps":["wake"],"source":"x"},
+              {"id":"home","title":"HOME","deps":["commute"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000
+          },
+          "t": {
+            "id": "t",
+            "name": "T",
+            "flags": {},
+            "nodes": [{"id":"call","title":"CALL","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"day","id":"gone"}
+          }
+        },
+        "run": "t",
+        "placed": true
+      },
+      "expected": [{"id":"call","title":"CALL","deps":[],"source":"x"}]
+    },
+    {
+      "name": "before: the other run's step waits on this run's last steps",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"leave","title":"LEAVE","deps":["wake"],"source":"x"}
+            ],
+            "done": {"wake":"done"},
+            "startedAt": 1700000000000
+          },
+          "pack": {
+            "id": "pack",
+            "name": "PACK",
+            "flags": {},
+            "nodes": [
+              {"id":"shoes","title":"SHOES","deps":[],"source":"x"},
+              {"id":"towel","title":"TOWEL","deps":[],"source":"x"},
+              {"id":"close","title":"CLOSE","deps":["shoes","towel"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"before","run":"day","id":"leave"}
+          }
+        },
+        "run": "day",
+        "placed": true
+      },
+      "expected": []
+    },
+    {
+      "name": "before: blockedExt names the last steps",
+      "fn": "waiting",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"leave","title":"LEAVE","deps":["wake"],"source":"x"}
+            ],
+            "done": {"wake":"done"},
+            "startedAt": 1700000000000
+          },
+          "pack": {
+            "id": "pack",
+            "name": "PACK",
+            "flags": {},
+            "nodes": [
+              {"id":"shoes","title":"SHOES","deps":[],"source":"x"},
+              {"id":"towel","title":"TOWEL","deps":[],"source":"x"},
+              {"id":"close","title":"CLOSE","deps":["shoes","towel"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"before","run":"day","id":"leave"}
+          }
+        },
+        "run": "day",
+        "placed": true
+      },
+      "expected": [
+        {
+          "id": "leave",
+          "title": "LEAVE",
+          "deps": ["wake"],
+          "source": "x",
+          "blockedBy": [],
+          "blockedExt": [{"run":"pack","id":"close"}]
+        }
+      ]
+    },
+    {
+      "name": "before: ready once the last steps are resolved",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"leave","title":"LEAVE","deps":["wake"],"source":"x"}
+            ],
+            "done": {"wake":"done"},
+            "startedAt": 1700000000000
+          },
+          "pack": {
+            "id": "pack",
+            "name": "PACK",
+            "flags": {},
+            "nodes": [
+              {"id":"shoes","title":"SHOES","deps":[],"source":"x"},
+              {"id":"towel","title":"TOWEL","deps":[],"source":"x"},
+              {"id":"close","title":"CLOSE","deps":["shoes","towel"],"source":"x"}
+            ],
+            "done": {"shoes":"done","towel":"done","close":"skipped"},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"before","run":"day","id":"leave"}
+          }
+        },
+        "run": "day",
+        "placed": true
+      },
+      "expected": [{"id":"leave","title":"LEAVE","deps":["wake"],"source":"x"}]
+    },
+    {
+      "name": "before: blockedExt shrinks as steps are resolved",
+      "fn": "waiting",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"leave","title":"LEAVE","deps":["wake"],"source":"x"}
+            ],
+            "done": {"wake":"done"},
+            "startedAt": 1700000000000
+          },
+          "pack": {
+            "id": "pack",
+            "name": "PACK",
+            "flags": {},
+            "nodes": [
+              {"id":"shoes","title":"SHOES","deps":[],"source":"x"},
+              {"id":"towel","title":"TOWEL","deps":[],"source":"x"},
+              {"id":"close","title":"CLOSE","deps":["shoes","towel"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"before","run":"day","id":"leave"}
+          },
+          "bag": {
+            "id": "bag",
+            "name": "BAG",
+            "flags": {},
+            "nodes": [
+              {"id":"zip","title":"ZIP","deps":[],"source":"x"},
+              {"id":"lock","title":"LOCK","deps":[],"source":"x"}
+            ],
+            "done": {"zip":"done"},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"before","run":"day","id":"leave"}
+          }
+        },
+        "run": "day",
+        "placed": true
+      },
+      "expected": [
+        {
+          "id": "leave",
+          "title": "LEAVE",
+          "deps": ["wake"],
+          "source": "x",
+          "blockedBy": [],
+          "blockedExt": [{"run":"pack","id":"close"},{"run":"bag","id":"lock"}]
+        }
+      ]
+    },
+    {
+      "name": "the placed run itself is not held up by a before placement",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"leave","title":"LEAVE","deps":["wake"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000
+          },
+          "pack": {
+            "id": "pack",
+            "name": "PACK",
+            "flags": {},
+            "nodes": [
+              {"id":"shoes","title":"SHOES","deps":[],"source":"x"},
+              {"id":"towel","title":"TOWEL","deps":[],"source":"x"},
+              {"id":"close","title":"CLOSE","deps":["shoes","towel"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"before","run":"day","id":"leave"}
+          }
+        },
+        "run": "pack",
+        "placed": true
+      },
+      "expected": [
+        {"id":"shoes","title":"SHOES","deps":[],"source":"x"},
+        {"id":"towel","title":"TOWEL","deps":[],"source":"x"}
+      ]
+    },
+    {
+      "name": "attachment to a deleted run is ignored",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "t": {
+            "id": "t",
+            "name": "T",
+            "flags": {},
+            "nodes": [{"id":"call","title":"CALL","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"gone","id":"x"}
+          }
+        },
+        "run": "t",
+        "placed": true
+      },
+      "expected": [{"id":"call","title":"CALL","deps":[],"source":"x"}]
+    },
+    {
+      "name": "no loop",
+      "fn": "hasCycle",
+      "input": {
+        "runs": {
+          "a": {
+            "id": "a",
+            "name": "A",
+            "flags": {},
+            "nodes": [
+              {"id":"a1","title":"A1","deps":[],"source":"x"},
+              {"id":"a2","title":"A2","deps":["a1"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"b","id":"b1"}
+          },
+          "b": {
+            "id": "b",
+            "name": "B",
+            "flags": {},
+            "nodes": [{"id":"b1","title":"B1","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000
+          }
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "two runs placed after each other loop",
+      "fn": "hasCycle",
+      "input": {
+        "runs": {
+          "a": {
+            "id": "a",
+            "name": "A",
+            "flags": {},
+            "nodes": [
+              {"id":"a1","title":"A1","deps":[],"source":"x"},
+              {"id":"a2","title":"A2","deps":["a1"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"b","id":"b1"}
+          },
+          "b": {
+            "id": "b",
+            "name": "B",
+            "flags": {},
+            "nodes": [{"id":"b1","title":"B1","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"a","id":"a2"}
+          }
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "a run placed after its own last step loops",
+      "fn": "hasCycle",
+      "input": {
+        "runs": {
+          "a": {
+            "id": "a",
+            "name": "A",
+            "flags": {},
+            "nodes": [
+              {"id":"a1","title":"A1","deps":[],"source":"x"},
+              {"id":"a2","title":"A2","deps":["a1"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"a","id":"a2"}
+          }
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "before and after the same run loop",
+      "fn": "hasCycle",
+      "input": {
+        "runs": {
+          "a": {
+            "id": "a",
+            "name": "A",
+            "flags": {},
+            "nodes": [
+              {"id":"a1","title":"A1","deps":[],"source":"x"},
+              {"id":"a2","title":"A2","deps":["a1"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"before","run":"b","id":"b1"}
+          },
+          "b": {
+            "id": "b",
+            "name": "B",
+            "flags": {},
+            "nodes": [{"id":"b1","title":"B1","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"before","run":"a","id":"a1"}
+          }
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "a chain of three runs does not loop",
+      "fn": "hasCycle",
+      "input": {
+        "runs": {
+          "a": {
+            "id": "a",
+            "name": "A",
+            "flags": {},
+            "nodes": [
+              {"id":"a1","title":"A1","deps":[],"source":"x"},
+              {"id":"a2","title":"A2","deps":["a1"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"b","id":"b1"}
+          },
+          "b": {
+            "id": "b",
+            "name": "B",
+            "flags": {},
+            "nodes": [{"id":"b1","title":"B1","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"c","id":"c1"}
+          },
+          "c": {
+            "id": "c",
+            "name": "C",
+            "flags": {},
+            "nodes": [{"id":"c1","title":"C1","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000
+          }
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "a chain of three runs closed into a loop",
+      "fn": "hasCycle",
+      "input": {
+        "runs": {
+          "a": {
+            "id": "a",
+            "name": "A",
+            "flags": {},
+            "nodes": [
+              {"id":"a1","title":"A1","deps":[],"source":"x"},
+              {"id":"a2","title":"A2","deps":["a1"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"b","id":"b1"}
+          },
+          "b": {
+            "id": "b",
+            "name": "B",
+            "flags": {},
+            "nodes": [{"id":"b1","title":"B1","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"c","id":"c1"}
+          },
+          "c": {
+            "id": "c",
+            "name": "C",
+            "flags": {},
+            "nodes": [{"id":"c1","title":"C1","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"a","id":"a2"}
+          }
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "placement relative to a deleted run cannot loop",
+      "fn": "hasCycle",
+      "input": {
+        "runs": {
+          "a": {
+            "id": "a",
+            "name": "A",
+            "flags": {},
+            "nodes": [
+              {"id":"a1","title":"A1","deps":[],"source":"x"},
+              {"id":"a2","title":"A2","deps":["a1"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"gone","id":"x"}
+          }
+        }
+      },
+      "expected": false
+    },
+    {"name":"no runs","fn":"hasCycle","input":{"runs":{}},"expected":false}
+  ]
+}

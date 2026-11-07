@@ -1,0 +1,271 @@
+{
+  "about": "wouldCycle and includes: what the routine editor refuses.",
+  "cases": [
+    {
+      "name": "the first step waiting on the last would loop",
+      "fn": "wouldCycle",
+      "input": {
+        "routine": {
+          "id": "m",
+          "name": "Morning",
+          "steps": [
+            {"id":"wake","type":"task","title":"Wake","after":[]},
+            {"id":"gym","type":"task","title":"Gym","after":[{"id":"wake"}],"when":"gym"},
+            {"id":"shower","type":"task","title":"Shower","after":[{"id":"wake"},{"id":"gym"}]},
+            {"id":"dress","type":"task","title":"Dress","after":[{"id":"shower"}]}
+          ]
+        },
+        "stepId": "wake",
+        "depId": "dress"
+      },
+      "expected": true
+    },
+    {
+      "name": "the last step waiting on the first is fine",
+      "fn": "wouldCycle",
+      "input": {
+        "routine": {
+          "id": "m",
+          "name": "Morning",
+          "steps": [
+            {"id":"wake","type":"task","title":"Wake","after":[]},
+            {"id":"gym","type":"task","title":"Gym","after":[{"id":"wake"}],"when":"gym"},
+            {"id":"shower","type":"task","title":"Shower","after":[{"id":"wake"},{"id":"gym"}]},
+            {"id":"dress","type":"task","title":"Dress","after":[{"id":"shower"}]}
+          ]
+        },
+        "stepId": "dress",
+        "depId": "wake"
+      },
+      "expected": false
+    },
+    {
+      "name": "a step waiting on itself would loop",
+      "fn": "wouldCycle",
+      "input": {
+        "routine": {
+          "id": "m",
+          "name": "Morning",
+          "steps": [
+            {"id":"wake","type":"task","title":"Wake","after":[]},
+            {"id":"gym","type":"task","title":"Gym","after":[{"id":"wake"}],"when":"gym"},
+            {"id":"shower","type":"task","title":"Shower","after":[{"id":"wake"},{"id":"gym"}]},
+            {"id":"dress","type":"task","title":"Dress","after":[{"id":"shower"}]}
+          ]
+        },
+        "stepId": "gym",
+        "depId": "gym"
+      },
+      "expected": true
+    },
+    {
+      "name": "a loop through a conditional step counts",
+      "fn": "wouldCycle",
+      "input": {
+        "routine": {
+          "id": "m",
+          "name": "Morning",
+          "steps": [
+            {"id":"wake","type":"task","title":"Wake","after":[]},
+            {"id":"gym","type":"task","title":"Gym","after":[{"id":"wake"}],"when":"gym"},
+            {"id":"shower","type":"task","title":"Shower","after":[{"id":"wake"},{"id":"gym"}]},
+            {"id":"dress","type":"task","title":"Dress","after":[{"id":"shower"}]}
+          ]
+        },
+        "stepId": "gym",
+        "depId": "shower"
+      },
+      "expected": true
+    },
+    {
+      "name": "a loop through a conditional edge counts",
+      "fn": "wouldCycle",
+      "input": {
+        "routine": {
+          "id": "r",
+          "name": "R",
+          "steps": [
+            {"id":"a","type":"task","title":"A","after":[]},
+            {"id":"b","type":"task","title":"B","after":[{"id":"a","when":"late"}]}
+          ]
+        },
+        "stepId": "a",
+        "depId": "b"
+      },
+      "expected": true
+    },
+    {
+      "name": "unrelated steps",
+      "fn": "wouldCycle",
+      "input": {
+        "routine": {
+          "id": "r",
+          "name": "R",
+          "steps": [
+            {"id":"a","type":"task","title":"A","after":[]},
+            {"id":"b","type":"task","title":"B","after":[]}
+          ]
+        },
+        "stepId": "a",
+        "depId": "b"
+      },
+      "expected": false
+    },
+    {
+      "name": "edges to missing steps are followed no further",
+      "fn": "wouldCycle",
+      "input": {
+        "routine": {
+          "id": "r",
+          "name": "R",
+          "steps": [
+            {"id":"a","type":"task","title":"A","after":[]},
+            {"id":"b","type":"task","title":"B","after":[{"id":"gone"}]}
+          ]
+        },
+        "stepId": "a",
+        "depId": "b"
+      },
+      "expected": false
+    },
+    {
+      "name": "an existing loop elsewhere does not hang",
+      "fn": "wouldCycle",
+      "input": {
+        "routine": {
+          "id": "r",
+          "name": "R",
+          "steps": [
+            {"id":"a","type":"task","title":"A","after":[]},
+            {"id":"x","type":"task","title":"X","after":[{"id":"y"}]},
+            {"id":"y","type":"task","title":"Y","after":[{"id":"x"}]},
+            {"id":"b","type":"task","title":"B","after":[{"id":"x"}]}
+          ]
+        },
+        "stepId": "a",
+        "depId": "b"
+      },
+      "expected": false
+    },
+    {
+      "name": "includes a direct sub-routine",
+      "fn": "includes",
+      "input": {
+        "routines": {
+          "a": {
+            "id": "a",
+            "name": "A",
+            "steps": [{"id":"s","type":"routine","routineId":"b","after":[]}]
+          },
+          "b": {"id":"b","name":"B","steps":[]}
+        },
+        "rid": "a",
+        "target": "b"
+      },
+      "expected": true
+    },
+    {
+      "name": "does not include the routine that includes it",
+      "fn": "includes",
+      "input": {
+        "routines": {
+          "a": {
+            "id": "a",
+            "name": "A",
+            "steps": [{"id":"s","type":"routine","routineId":"b","after":[]}]
+          },
+          "b": {"id":"b","name":"B","steps":[]}
+        },
+        "rid": "b",
+        "target": "a"
+      },
+      "expected": false
+    },
+    {
+      "name": "a routine includes itself",
+      "fn": "includes",
+      "input": {"routines":{"b":{"id":"b","name":"B","steps":[]}},"rid":"b","target":"b"},
+      "expected": true
+    },
+    {
+      "name": "includes through another routine",
+      "fn": "includes",
+      "input": {
+        "routines": {
+          "a": {
+            "id": "a",
+            "name": "A",
+            "steps": [{"id":"s","type":"routine","routineId":"b","after":[]}]
+          },
+          "b": {"id":"b","name":"B","steps":[]},
+          "c": {
+            "id": "c",
+            "name": "C",
+            "steps": [
+              {"id":"x","type":"task","title":"X","after":[]},
+              {"id":"a","type":"routine","routineId":"a","after":[]}
+            ]
+          }
+        },
+        "rid": "c",
+        "target": "b"
+      },
+      "expected": true
+    },
+    {
+      "name": "a missing routine includes only itself",
+      "fn": "includes",
+      "input": {
+        "routines": {
+          "a": {
+            "id": "a",
+            "name": "A",
+            "steps": [{"id":"s","type":"routine","routineId":"b","after":[]}]
+          }
+        },
+        "rid": "gone",
+        "target": "a"
+      },
+      "expected": false
+    },
+    {
+      "name": "a loop of inclusions without the target ends",
+      "fn": "includes",
+      "input": {
+        "routines": {
+          "p": {
+            "id": "p",
+            "name": "P",
+            "steps": [{"id":"q","type":"routine","routineId":"q","after":[]}]
+          },
+          "q": {
+            "id": "q",
+            "name": "Q",
+            "steps": [{"id":"p","type":"routine","routineId":"p","after":[]}]
+          },
+          "b": {"id":"b","name":"B","steps":[]}
+        },
+        "rid": "p",
+        "target": "b"
+      },
+      "expected": false
+    },
+    {
+      "name": "a task step with a routineId is not an inclusion",
+      "fn": "includes",
+      "input": {
+        "routines": {
+          "p": {
+            "id": "p",
+            "name": "P",
+            "steps": [{"id":"s","type":"task","title":"S","routineId":"b","after":[]}]
+          },
+          "b": {"id":"b","name":"B","steps":[]}
+        },
+        "rid": "p",
+        "target": "b"
+      },
+      "expected": false
+    }
+  ]
+}

@@ -1,0 +1,447 @@
+{
+  "about": "ready, waiting, isFinished, roots and sinks: progress through one run.",
+  "cases": [
+    {
+      "name": "fresh run: only the first step is ready",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "m": {
+            "id": "m",
+            "name": "M",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"shower","title":"SHOWER","deps":["wake"],"source":"x"},
+              {"id":"dress","title":"DRESS","deps":["shower"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000
+          }
+        },
+        "run": "m"
+      },
+      "expected": [{"id":"wake","title":"WAKE","deps":[],"source":"x"}]
+    },
+    {
+      "name": "fresh run: the rest wait",
+      "fn": "waiting",
+      "input": {
+        "runs": {
+          "m": {
+            "id": "m",
+            "name": "M",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"shower","title":"SHOWER","deps":["wake"],"source":"x"},
+              {"id":"dress","title":"DRESS","deps":["shower"],"source":"x"}
+            ],
+            "done": {},
+            "startedAt": 1700000000000
+          }
+        },
+        "run": "m"
+      },
+      "expected": [
+        {
+          "id": "shower",
+          "title": "SHOWER",
+          "deps": ["wake"],
+          "source": "x",
+          "blockedBy": ["wake"],
+          "blockedExt": []
+        },
+        {
+          "id": "dress",
+          "title": "DRESS",
+          "deps": ["shower"],
+          "source": "x",
+          "blockedBy": ["shower"],
+          "blockedExt": []
+        }
+      ]
+    },
+    {
+      "name": "after the first step",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "m": {
+            "id": "m",
+            "name": "M",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"shower","title":"SHOWER","deps":["wake"],"source":"x"},
+              {"id":"dress","title":"DRESS","deps":["shower"],"source":"x"}
+            ],
+            "done": {"wake":"done"},
+            "startedAt": 1700000000000
+          }
+        },
+        "run": "m"
+      },
+      "expected": [{"id":"shower","title":"SHOWER","deps":["wake"],"source":"x"}]
+    },
+    {
+      "name": "after the first step, still waiting",
+      "fn": "waiting",
+      "input": {
+        "runs": {
+          "m": {
+            "id": "m",
+            "name": "M",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"shower","title":"SHOWER","deps":["wake"],"source":"x"},
+              {"id":"dress","title":"DRESS","deps":["shower"],"source":"x"}
+            ],
+            "done": {"wake":"done"},
+            "startedAt": 1700000000000
+          }
+        },
+        "run": "m"
+      },
+      "expected": [
+        {
+          "id": "dress",
+          "title": "DRESS",
+          "deps": ["shower"],
+          "source": "x",
+          "blockedBy": ["shower"],
+          "blockedExt": []
+        }
+      ]
+    },
+    {
+      "name": "a dropped step lets the next go ahead",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "m": {
+            "id": "m",
+            "name": "M",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"shower","title":"SHOWER","deps":["wake"],"source":"x"},
+              {"id":"dress","title":"DRESS","deps":["shower"],"source":"x"}
+            ],
+            "done": {"wake":"skipped"},
+            "startedAt": 1700000000000
+          }
+        },
+        "run": "m"
+      },
+      "expected": [{"id":"shower","title":"SHOWER","deps":["wake"],"source":"x"}]
+    },
+    {
+      "name": "a step waits until all its prerequisites are resolved",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "f": {
+            "id": "f",
+            "name": "F",
+            "flags": {},
+            "nodes": [
+              {"id":"a","title":"A","deps":[],"source":"x"},
+              {"id":"b","title":"B","deps":[],"source":"x"},
+              {"id":"c","title":"C","deps":["a","b"],"source":"x"},
+              {"id":"d","title":"D","deps":["c"],"source":"x"},
+              {"id":"e","title":"E","deps":["a"],"source":"x"}
+            ],
+            "done": {"a":"done"},
+            "startedAt": 1700000000000
+          }
+        },
+        "run": "f"
+      },
+      "expected": [
+        {"id":"b","title":"B","deps":[],"source":"x"},
+        {"id":"e","title":"E","deps":["a"],"source":"x"}
+      ]
+    },
+    {
+      "name": "blockedBy lists only unresolved prerequisites",
+      "fn": "waiting",
+      "input": {
+        "runs": {
+          "f": {
+            "id": "f",
+            "name": "F",
+            "flags": {},
+            "nodes": [
+              {"id":"a","title":"A","deps":[],"source":"x"},
+              {"id":"b","title":"B","deps":[],"source":"x"},
+              {"id":"c","title":"C","deps":["a","b"],"source":"x"},
+              {"id":"d","title":"D","deps":["c"],"source":"x"},
+              {"id":"e","title":"E","deps":["a"],"source":"x"}
+            ],
+            "done": {"a":"done"},
+            "startedAt": 1700000000000
+          }
+        },
+        "run": "f"
+      },
+      "expected": [
+        {"id":"c","title":"C","deps":["a","b"],"source":"x","blockedBy":["b"],"blockedExt":[]},
+        {"id":"d","title":"D","deps":["c"],"source":"x","blockedBy":["c"],"blockedExt":[]}
+      ]
+    },
+    {
+      "name": "resolved steps are neither ready nor waiting",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "f": {
+            "id": "f",
+            "name": "F",
+            "flags": {},
+            "nodes": [
+              {"id":"a","title":"A","deps":[],"source":"x"},
+              {"id":"b","title":"B","deps":[],"source":"x"},
+              {"id":"c","title":"C","deps":["a","b"],"source":"x"},
+              {"id":"d","title":"D","deps":["c"],"source":"x"},
+              {"id":"e","title":"E","deps":["a"],"source":"x"}
+            ],
+            "done": {"a":"done","b":"done","c":"done"},
+            "startedAt": 1700000000000
+          }
+        },
+        "run": "f"
+      },
+      "expected": [
+        {"id":"d","title":"D","deps":["c"],"source":"x"},
+        {"id":"e","title":"E","deps":["a"],"source":"x"}
+      ]
+    },
+    {
+      "name": "resolved steps are not waiting",
+      "fn": "waiting",
+      "input": {
+        "runs": {
+          "f": {
+            "id": "f",
+            "name": "F",
+            "flags": {},
+            "nodes": [
+              {"id":"a","title":"A","deps":[],"source":"x"},
+              {"id":"b","title":"B","deps":[],"source":"x"},
+              {"id":"c","title":"C","deps":["a","b"],"source":"x"},
+              {"id":"d","title":"D","deps":["c"],"source":"x"},
+              {"id":"e","title":"E","deps":["a"],"source":"x"}
+            ],
+            "done": {"a":"done","b":"done","c":"done"},
+            "startedAt": 1700000000000
+          }
+        },
+        "run": "f"
+      },
+      "expected": []
+    },
+    {
+      "name": "a step resolved before its prerequisites stays resolved",
+      "fn": "waiting",
+      "input": {
+        "runs": {
+          "m": {
+            "id": "m",
+            "name": "M",
+            "flags": {},
+            "nodes": [
+              {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+              {"id":"shower","title":"SHOWER","deps":["wake"],"source":"x"},
+              {"id":"dress","title":"DRESS","deps":["shower"],"source":"x"}
+            ],
+            "done": {"dress":"done"},
+            "startedAt": 1700000000000
+          }
+        },
+        "run": "m"
+      },
+      "expected": [
+        {
+          "id": "shower",
+          "title": "SHOWER",
+          "deps": ["wake"],
+          "source": "x",
+          "blockedBy": ["wake"],
+          "blockedExt": []
+        }
+      ]
+    },
+    {
+      "name": "unfinished",
+      "fn": "isFinished",
+      "input": {
+        "run": {
+          "id": "m",
+          "name": "M",
+          "flags": {},
+          "nodes": [
+            {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+            {"id":"shower","title":"SHOWER","deps":["wake"],"source":"x"},
+            {"id":"dress","title":"DRESS","deps":["shower"],"source":"x"}
+          ],
+          "done": {"wake":"done","shower":"done"},
+          "startedAt": 1700000000000
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "finished: every step done or skipped",
+      "fn": "isFinished",
+      "input": {
+        "run": {
+          "id": "m",
+          "name": "M",
+          "flags": {},
+          "nodes": [
+            {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+            {"id":"shower","title":"SHOWER","deps":["wake"],"source":"x"},
+            {"id":"dress","title":"DRESS","deps":["shower"],"source":"x"}
+          ],
+          "done": {"wake":"done","shower":"skipped","dress":"done"},
+          "startedAt": 1700000000000
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "marks for steps not in the run do not count",
+      "fn": "isFinished",
+      "input": {
+        "run": {
+          "id": "m",
+          "name": "M",
+          "flags": {},
+          "nodes": [
+            {"id":"wake","title":"WAKE","deps":[],"source":"x"},
+            {"id":"shower","title":"SHOWER","deps":["wake"],"source":"x"},
+            {"id":"dress","title":"DRESS","deps":["shower"],"source":"x"}
+          ],
+          "done": {"wake":"done","shower":"done","gone":"done"},
+          "startedAt": 1700000000000
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "a run with no steps counts as finished",
+      "fn": "isFinished",
+      "input": {
+        "run": {"id":"e","name":"E","flags":{},"nodes":[],"done":{},"startedAt":1700000000000}
+      },
+      "expected": true
+    },
+    {
+      "name": "roots: steps waiting on nothing",
+      "fn": "roots",
+      "input": {
+        "run": {
+          "id": "f",
+          "name": "F",
+          "flags": {},
+          "nodes": [
+            {"id":"a","title":"A","deps":[],"source":"x"},
+            {"id":"b","title":"B","deps":[],"source":"x"},
+            {"id":"c","title":"C","deps":["a","b"],"source":"x"},
+            {"id":"d","title":"D","deps":["c"],"source":"x"},
+            {"id":"e","title":"E","deps":["a"],"source":"x"}
+          ],
+          "done": {},
+          "startedAt": 1700000000000
+        }
+      },
+      "expected": [
+        {"id":"a","title":"A","deps":[],"source":"x"},
+        {"id":"b","title":"B","deps":[],"source":"x"}
+      ]
+    },
+    {
+      "name": "sinks: steps nothing waits on",
+      "fn": "sinks",
+      "input": {
+        "run": {
+          "id": "f",
+          "name": "F",
+          "flags": {},
+          "nodes": [
+            {"id":"a","title":"A","deps":[],"source":"x"},
+            {"id":"b","title":"B","deps":[],"source":"x"},
+            {"id":"c","title":"C","deps":["a","b"],"source":"x"},
+            {"id":"d","title":"D","deps":["c"],"source":"x"},
+            {"id":"e","title":"E","deps":["a"],"source":"x"}
+          ],
+          "done": {},
+          "startedAt": 1700000000000
+        }
+      },
+      "expected": [
+        {"id":"d","title":"D","deps":["c"],"source":"x"},
+        {"id":"e","title":"E","deps":["a"],"source":"x"}
+      ]
+    },
+    {
+      "name": "a single step is both root and sink (roots)",
+      "fn": "roots",
+      "input": {
+        "run": {
+          "id": "t",
+          "name": "T",
+          "flags": {},
+          "nodes": [{"id":"task","title":"TASK","deps":[],"source":"x"}],
+          "done": {},
+          "startedAt": 1700000000000
+        }
+      },
+      "expected": [{"id":"task","title":"TASK","deps":[],"source":"x"}]
+    },
+    {
+      "name": "a single step is both root and sink (sinks)",
+      "fn": "sinks",
+      "input": {
+        "run": {
+          "id": "t",
+          "name": "T",
+          "flags": {},
+          "nodes": [{"id":"task","title":"TASK","deps":[],"source":"x"}],
+          "done": {},
+          "startedAt": 1700000000000
+        }
+      },
+      "expected": [{"id":"task","title":"TASK","deps":[],"source":"x"}]
+    },
+    {
+      "name": "placements are ignored without them",
+      "fn": "ready",
+      "input": {
+        "runs": {
+          "day": {
+            "id": "day",
+            "name": "DAY",
+            "flags": {},
+            "nodes": [{"id":"wake","title":"WAKE","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000
+          },
+          "gym": {
+            "id": "gym",
+            "name": "GYM",
+            "flags": {},
+            "nodes": [{"id":"unpack","title":"UNPACK","deps":[],"source":"x"}],
+            "done": {},
+            "startedAt": 1700000000000,
+            "attach": {"rel":"after","run":"day","id":"wake"}
+          }
+        },
+        "run": "gym"
+      },
+      "expected": [{"id":"unpack","title":"UNPACK","deps":[],"source":"x"}]
+    }
+  ]
+}

@@ -1,0 +1,531 @@
+{
+  "about": "collectFlags: the options offered when starting a routine.",
+  "cases": [
+    {
+      "name": "walks sub-routines",
+      "fn": "collectFlags",
+      "input": {
+        "routines": {
+          "x": {
+            "id": "x",
+            "name": "X",
+            "steps": [{"id":"a","type":"task","title":"A","after":[],"when":"Abroad"}]
+          },
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"x","type":"routine","routineId":"x","after":[]},
+              {"id":"b","type":"task","title":"B","after":[{"id":"x","when":"!rain"}],"when":"gym"}
+            ]
+          }
+        },
+        "root": "r"
+      },
+      "expected": ["abroad","gym","rain"]
+    },
+    {
+      "name": "seed Travel",
+      "fn": "collectFlags",
+      "input": {
+        "routines": {
+          "breakfast": {
+            "id": "breakfast",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Start the coffee","when":"","after":[]},
+              {"id":"food","type":"task","title":"Make food","when":"","after":[]},
+              {
+                "id": "eat",
+                "type": "task",
+                "title": "Eat",
+                "when": "",
+                "after": [{"id":"coffee"},{"id":"food"}]
+              },
+              {"id":"clean","type":"task","title":"Clean up","when":"","after":[{"id":"eat"}]}
+            ]
+          },
+          "morning": {
+            "id": "morning",
+            "name": "Morning",
+            "steps": [
+              {"id":"wake","type":"task","title":"Get out of bed","when":"","after":[]},
+              {
+                "id": "water",
+                "type": "task",
+                "title": "Drink a glass of water",
+                "when": "",
+                "after": [{"id":"wake"}]
+              },
+              {"id":"gym","type":"task","title":"Gym session","when":"gym","after":[{"id":"water"}]},
+              {
+                "id": "shower",
+                "type": "task",
+                "title": "Shower",
+                "when": "",
+                "after": [{"id":"wake"},{"id":"gym"}]
+              },
+              {"id":"teeth","type":"task","title":"Brush teeth","when":"","after":[{"id":"shower"}]},
+              {"id":"dress","type":"task","title":"Get dressed","when":"","after":[{"id":"teeth"}]},
+              {
+                "id": "bf",
+                "type": "routine",
+                "routineId": "breakfast",
+                "when": "",
+                "after": [{"id":"dress"}]
+              },
+              {"id":"meds","type":"task","title":"Take vitamins","when":"","after":[{"id":"bf"}]}
+            ]
+          },
+          "travel": {
+            "id": "travel",
+            "name": "Travel",
+            "steps": [
+              {"id":"checkin","type":"task","title":"Check in online","when":"flying","after":[]},
+              {"id":"passport","type":"task","title":"Passport","when":"abroad","after":[]},
+              {"id":"adapter","type":"task","title":"Power adapter","when":"abroad","after":[]},
+              {"id":"clothes","type":"task","title":"Clothes","when":"","after":[]},
+              {
+                "id": "toiletries",
+                "type": "task",
+                "title": "Toiletries",
+                "when": "",
+                "after": [{"id":"clothes"}]
+              },
+              {"id":"charger","type":"task","title":"Phone charger","when":"","after":[]},
+              {
+                "id": "close",
+                "type": "task",
+                "title": "Pack the bag",
+                "when": "",
+                "after": [
+                  {"id":"passport"},
+                  {"id":"adapter"},
+                  {"id":"toiletries"},
+                  {"id":"charger"},
+                  {"id":"checkin"}
+                ]
+              },
+              {
+                "id": "lights",
+                "type": "task",
+                "title": "Lights off, windows shut",
+                "when": "",
+                "after": [{"id":"close"}]
+              },
+              {
+                "id": "lock",
+                "type": "task",
+                "title": "Lock the door",
+                "when": "",
+                "after": [{"id":"lights"}]
+              }
+            ]
+          }
+        },
+        "root": "travel"
+      },
+      "expected": ["abroad","flying"]
+    },
+    {
+      "name": "seed Morning, which includes Breakfast",
+      "fn": "collectFlags",
+      "input": {
+        "routines": {
+          "breakfast": {
+            "id": "breakfast",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Start the coffee","when":"","after":[]},
+              {"id":"food","type":"task","title":"Make food","when":"","after":[]},
+              {
+                "id": "eat",
+                "type": "task",
+                "title": "Eat",
+                "when": "",
+                "after": [{"id":"coffee"},{"id":"food"}]
+              },
+              {"id":"clean","type":"task","title":"Clean up","when":"","after":[{"id":"eat"}]}
+            ]
+          },
+          "morning": {
+            "id": "morning",
+            "name": "Morning",
+            "steps": [
+              {"id":"wake","type":"task","title":"Get out of bed","when":"","after":[]},
+              {
+                "id": "water",
+                "type": "task",
+                "title": "Drink a glass of water",
+                "when": "",
+                "after": [{"id":"wake"}]
+              },
+              {"id":"gym","type":"task","title":"Gym session","when":"gym","after":[{"id":"water"}]},
+              {
+                "id": "shower",
+                "type": "task",
+                "title": "Shower",
+                "when": "",
+                "after": [{"id":"wake"},{"id":"gym"}]
+              },
+              {"id":"teeth","type":"task","title":"Brush teeth","when":"","after":[{"id":"shower"}]},
+              {"id":"dress","type":"task","title":"Get dressed","when":"","after":[{"id":"teeth"}]},
+              {
+                "id": "bf",
+                "type": "routine",
+                "routineId": "breakfast",
+                "when": "",
+                "after": [{"id":"dress"}]
+              },
+              {"id":"meds","type":"task","title":"Take vitamins","when":"","after":[{"id":"bf"}]}
+            ]
+          },
+          "travel": {
+            "id": "travel",
+            "name": "Travel",
+            "steps": [
+              {"id":"checkin","type":"task","title":"Check in online","when":"flying","after":[]},
+              {"id":"passport","type":"task","title":"Passport","when":"abroad","after":[]},
+              {"id":"adapter","type":"task","title":"Power adapter","when":"abroad","after":[]},
+              {"id":"clothes","type":"task","title":"Clothes","when":"","after":[]},
+              {
+                "id": "toiletries",
+                "type": "task",
+                "title": "Toiletries",
+                "when": "",
+                "after": [{"id":"clothes"}]
+              },
+              {"id":"charger","type":"task","title":"Phone charger","when":"","after":[]},
+              {
+                "id": "close",
+                "type": "task",
+                "title": "Pack the bag",
+                "when": "",
+                "after": [
+                  {"id":"passport"},
+                  {"id":"adapter"},
+                  {"id":"toiletries"},
+                  {"id":"charger"},
+                  {"id":"checkin"}
+                ]
+              },
+              {
+                "id": "lights",
+                "type": "task",
+                "title": "Lights off, windows shut",
+                "when": "",
+                "after": [{"id":"close"}]
+              },
+              {
+                "id": "lock",
+                "type": "task",
+                "title": "Lock the door",
+                "when": "",
+                "after": [{"id":"lights"}]
+              }
+            ]
+          }
+        },
+        "root": "morning"
+      },
+      "expected": ["gym"]
+    },
+    {
+      "name": "no flags",
+      "fn": "collectFlags",
+      "input": {
+        "routines": {
+          "breakfast": {
+            "id": "breakfast",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Start the coffee","when":"","after":[]},
+              {"id":"food","type":"task","title":"Make food","when":"","after":[]},
+              {
+                "id": "eat",
+                "type": "task",
+                "title": "Eat",
+                "when": "",
+                "after": [{"id":"coffee"},{"id":"food"}]
+              },
+              {"id":"clean","type":"task","title":"Clean up","when":"","after":[{"id":"eat"}]}
+            ]
+          },
+          "morning": {
+            "id": "morning",
+            "name": "Morning",
+            "steps": [
+              {"id":"wake","type":"task","title":"Get out of bed","when":"","after":[]},
+              {
+                "id": "water",
+                "type": "task",
+                "title": "Drink a glass of water",
+                "when": "",
+                "after": [{"id":"wake"}]
+              },
+              {"id":"gym","type":"task","title":"Gym session","when":"gym","after":[{"id":"water"}]},
+              {
+                "id": "shower",
+                "type": "task",
+                "title": "Shower",
+                "when": "",
+                "after": [{"id":"wake"},{"id":"gym"}]
+              },
+              {"id":"teeth","type":"task","title":"Brush teeth","when":"","after":[{"id":"shower"}]},
+              {"id":"dress","type":"task","title":"Get dressed","when":"","after":[{"id":"teeth"}]},
+              {
+                "id": "bf",
+                "type": "routine",
+                "routineId": "breakfast",
+                "when": "",
+                "after": [{"id":"dress"}]
+              },
+              {"id":"meds","type":"task","title":"Take vitamins","when":"","after":[{"id":"bf"}]}
+            ]
+          },
+          "travel": {
+            "id": "travel",
+            "name": "Travel",
+            "steps": [
+              {"id":"checkin","type":"task","title":"Check in online","when":"flying","after":[]},
+              {"id":"passport","type":"task","title":"Passport","when":"abroad","after":[]},
+              {"id":"adapter","type":"task","title":"Power adapter","when":"abroad","after":[]},
+              {"id":"clothes","type":"task","title":"Clothes","when":"","after":[]},
+              {
+                "id": "toiletries",
+                "type": "task",
+                "title": "Toiletries",
+                "when": "",
+                "after": [{"id":"clothes"}]
+              },
+              {"id":"charger","type":"task","title":"Phone charger","when":"","after":[]},
+              {
+                "id": "close",
+                "type": "task",
+                "title": "Pack the bag",
+                "when": "",
+                "after": [
+                  {"id":"passport"},
+                  {"id":"adapter"},
+                  {"id":"toiletries"},
+                  {"id":"charger"},
+                  {"id":"checkin"}
+                ]
+              },
+              {
+                "id": "lights",
+                "type": "task",
+                "title": "Lights off, windows shut",
+                "when": "",
+                "after": [{"id":"close"}]
+              },
+              {
+                "id": "lock",
+                "type": "task",
+                "title": "Lock the door",
+                "when": "",
+                "after": [{"id":"lights"}]
+              }
+            ]
+          }
+        },
+        "root": "breakfast"
+      },
+      "expected": []
+    },
+    {
+      "name": "missing routine",
+      "fn": "collectFlags",
+      "input": {
+        "routines": {
+          "breakfast": {
+            "id": "breakfast",
+            "name": "Breakfast",
+            "steps": [
+              {"id":"coffee","type":"task","title":"Start the coffee","when":"","after":[]},
+              {"id":"food","type":"task","title":"Make food","when":"","after":[]},
+              {
+                "id": "eat",
+                "type": "task",
+                "title": "Eat",
+                "when": "",
+                "after": [{"id":"coffee"},{"id":"food"}]
+              },
+              {"id":"clean","type":"task","title":"Clean up","when":"","after":[{"id":"eat"}]}
+            ]
+          },
+          "morning": {
+            "id": "morning",
+            "name": "Morning",
+            "steps": [
+              {"id":"wake","type":"task","title":"Get out of bed","when":"","after":[]},
+              {
+                "id": "water",
+                "type": "task",
+                "title": "Drink a glass of water",
+                "when": "",
+                "after": [{"id":"wake"}]
+              },
+              {"id":"gym","type":"task","title":"Gym session","when":"gym","after":[{"id":"water"}]},
+              {
+                "id": "shower",
+                "type": "task",
+                "title": "Shower",
+                "when": "",
+                "after": [{"id":"wake"},{"id":"gym"}]
+              },
+              {"id":"teeth","type":"task","title":"Brush teeth","when":"","after":[{"id":"shower"}]},
+              {"id":"dress","type":"task","title":"Get dressed","when":"","after":[{"id":"teeth"}]},
+              {
+                "id": "bf",
+                "type": "routine",
+                "routineId": "breakfast",
+                "when": "",
+                "after": [{"id":"dress"}]
+              },
+              {"id":"meds","type":"task","title":"Take vitamins","when":"","after":[{"id":"bf"}]}
+            ]
+          },
+          "travel": {
+            "id": "travel",
+            "name": "Travel",
+            "steps": [
+              {"id":"checkin","type":"task","title":"Check in online","when":"flying","after":[]},
+              {"id":"passport","type":"task","title":"Passport","when":"abroad","after":[]},
+              {"id":"adapter","type":"task","title":"Power adapter","when":"abroad","after":[]},
+              {"id":"clothes","type":"task","title":"Clothes","when":"","after":[]},
+              {
+                "id": "toiletries",
+                "type": "task",
+                "title": "Toiletries",
+                "when": "",
+                "after": [{"id":"clothes"}]
+              },
+              {"id":"charger","type":"task","title":"Phone charger","when":"","after":[]},
+              {
+                "id": "close",
+                "type": "task",
+                "title": "Pack the bag",
+                "when": "",
+                "after": [
+                  {"id":"passport"},
+                  {"id":"adapter"},
+                  {"id":"toiletries"},
+                  {"id":"charger"},
+                  {"id":"checkin"}
+                ]
+              },
+              {
+                "id": "lights",
+                "type": "task",
+                "title": "Lights off, windows shut",
+                "when": "",
+                "after": [{"id":"close"}]
+              },
+              {
+                "id": "lock",
+                "type": "task",
+                "title": "Lock the door",
+                "when": "",
+                "after": [{"id":"lights"}]
+              }
+            ]
+          }
+        },
+        "root": "gone"
+      },
+      "expected": []
+    },
+    {
+      "name": "missing sub-routine is skipped",
+      "fn": "collectFlags",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [{"id":"s","type":"routine","routineId":"gone","after":[],"when":"gym"}]
+          }
+        },
+        "root": "r"
+      },
+      "expected": ["gym"]
+    },
+    {
+      "name": "a routine including itself is visited once",
+      "fn": "collectFlags",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [{"id":"me","type":"routine","routineId":"r","after":[],"when":"loop"}]
+          }
+        },
+        "root": "r"
+      },
+      "expected": ["loop"]
+    },
+    {
+      "name": "the same sub-routine twice",
+      "fn": "collectFlags",
+      "input": {
+        "routines": {
+          "x": {
+            "id": "x",
+            "name": "X",
+            "steps": [{"id":"a","type":"task","title":"A","after":[],"when":"Abroad"}]
+          },
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"one","type":"routine","routineId":"x","after":[]},
+              {"id":"two","type":"routine","routineId":"x","after":[{"id":"one"}]}
+            ]
+          }
+        },
+        "root": "r"
+      },
+      "expected": ["abroad"]
+    },
+    {
+      "name": "a hidden sub-routine still offers its flags",
+      "fn": "collectFlags",
+      "input": {
+        "routines": {
+          "x": {
+            "id": "x",
+            "name": "X",
+            "steps": [{"id":"a","type":"task","title":"A","after":[],"when":"Abroad"}]
+          },
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [{"id":"x","type":"routine","routineId":"x","after":[],"when":"never"}]
+          }
+        },
+        "root": "r"
+      },
+      "expected": ["abroad","never"]
+    },
+    {
+      "name": "deduplicated and sorted by character code",
+      "fn": "collectFlags",
+      "input": {
+        "routines": {
+          "r": {
+            "id": "r",
+            "name": "R",
+            "steps": [
+              {"id":"a","type":"task","title":"A","after":[],"when":"b a10 a2"},
+              {"id":"b","type":"task","title":"B","after":[{"id":"a"}],"when":"Zed !b ä a"}
+            ]
+          }
+        },
+        "root": "r"
+      },
+      "expected": ["a","a10","a2","b","zed","ä"]
+    }
+  ]
+}
