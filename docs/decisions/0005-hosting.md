@@ -54,9 +54,10 @@ the move is a step of its own, built before the old address is retired:
    device's last import and the difference becomes ordinary changes
    (something missing since then becomes a delete, which per 0003 is a status
    change); then that snapshot becomes the device's new base, so nothing is
-   sent twice. Where the new app changed the same thing since that device's
-   last import, timing does not decide: the conflict is shown to the user to
-   resolve (0003). One import path, written once in the core and testable
+   sent twice. Where anything else changed the same thing since that device's
+   last import (the new app, or another device's upload), timing does not
+   decide: the conflict is shown to the user to resolve (0003). Only a field
+   nothing else has touched since then applies silently. One import path, written once in the core and testable
    without a browser.
 3. **Export → Import stays available** as the fallback when the upload is not
    possible.
