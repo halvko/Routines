@@ -15,7 +15,7 @@ checks still need a Cloudflare token (see "Still to do").
 | # | What | Result |
 |---|---|---|
 | 1 | Rust Worker → per-user Durable Object → SQLite | **Worked.** `get_by_name(user)` routes; tables are created in the constructor with `sql().exec`. |
-| 2 | Passkeys with `webauthn-rs` 0.6.2 | **Worked with a workaround.** Finishing registration panicked: `webauthn-rs-core` calls `std::time::SystemTime::now()`, which wasm32-unknown-unknown does not have. A four-line patch (`patches/`) reads the clock from JavaScript instead. Sign-in needed nothing. |
+| 2 | Passkeys with `webauthn-rs` 0.6.2 | **Worked with a workaround.** Finishing registration panicked: `webauthn-rs-core` calls `std::time::SystemTime::now()`, which wasm32-unknown-unknown does not have. A small patch (`patches/`: four lines of code and a `js-sys` dependency) reads the clock from JavaScript instead. Sign-in needed nothing. |
 | 3 | One Argon2id hash (m=19456 KiB, t=2, p=1) | **Worked.** About 32 ms per request locally (median of 10, including HTTP). CPU time on Cloudflare: not measured yet. |
 | 4 | WebSocket push with the hibernation API | **Worked**, including after hibernation: with the socket idle for 20 s the object was evicted, and a fresh instance pushed through the old socket. |
 | 5 | One MCP tool behind hand-rolled OAuth | **Worked against a scripted client playing Claude's part.** **Not yet tried with Claude itself**, which needs a public URL. |
@@ -89,7 +89,7 @@ token handling in `src/user.rs`, and 110 lines of MCP in `src/mcp.rs`.
 
 **Confirm 0005, once the deployed checks pass.** Every item that could be
 tried locally works in Rust. The only problem was one clock call, fixed by a
-four-line patch, well inside the weekend time box. Nothing so far
+small patch, well inside the time box issue #3 set (about a weekend). Nothing so far
 points at Fly.io.
 
 What could still change that: Claude failing to connect for a reason that

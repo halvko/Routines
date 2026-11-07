@@ -1,7 +1,7 @@
 #!/bin/sh
 # webauthn-rs-core 0.6.2 calls std::time::SystemTime::now(), which panics on
 # wasm32-unknown-unknown. Fetch the published crate, check it, and apply a
-# four-line patch that reads the clock from JavaScript instead. Cargo.toml
+# small patch that reads the clock from JavaScript instead. Cargo.toml
 # points [patch.crates-io] at the result.
 set -eu
 cd "$(dirname "$0")"

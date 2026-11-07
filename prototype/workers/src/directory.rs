@@ -33,7 +33,11 @@ impl DurableObject for Directory {
                 client["client_id_issued_at"] = json!(now_ms() / 1000);
                 sql.exec(
                     "INSERT INTO clients (id, v, created) VALUES (?, ?, ?)",
-                    vec![id.into(), client.to_string().into(), (now_ms() as i64).into()],
+                    vec![
+                        id.into(),
+                        client.to_string().into(),
+                        (now_ms() as i64).into(),
+                    ],
                 )?;
                 Response::from_json(&client)
             }
@@ -43,7 +47,9 @@ impl DurableObject for Directory {
                     v: String,
                 }
                 let id = body["client_id"].as_str().unwrap_or("");
-                let rows: Vec<Row> = sql.exec("SELECT v FROM clients WHERE id = ?", vec![id.into()])?.to_array()?;
+                let rows: Vec<Row> = sql
+                    .exec("SELECT v FROM clients WHERE id = ?", vec![id.into()])?
+                    .to_array()?;
                 match rows.first() {
                     Some(r) => Response::ok(r.v.clone()),
                     None => Response::error("unknown client", 404),

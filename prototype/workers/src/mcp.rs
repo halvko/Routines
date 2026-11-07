@@ -2,8 +2,8 @@
 //! `rmcp`'s own HTTP transport needs a Tokio runtime, which Workers lacks.
 
 use rmcp::model::{
-    CallToolResult, ContentBlock, DiscoverResult, Implementation, InitializeResult, ListToolsResult,
-    ProtocolVersion, ServerCapabilities, Tool,
+    CallToolResult, ContentBlock, DiscoverResult, Implementation, InitializeResult,
+    ListToolsResult, ProtocolVersion, ServerCapabilities, Tool,
 };
 use serde_json::{Value, json};
 
@@ -17,7 +17,9 @@ fn server_info() -> Implementation {
 
 fn list_routines_tool() -> Tool {
     let schema = json!({ "type": "object", "properties": {}, "additionalProperties": false });
-    let Value::Object(schema) = schema else { unreachable!() };
+    let Value::Object(schema) = schema else {
+        unreachable!()
+    };
     Tool::new("list_routines", "List the user's routines.", schema)
 }
 
@@ -34,17 +36,15 @@ pub fn handle(msg: &Value, header_version: Option<&str>, routines: &[Value]) -> 
         .or(header_version)
         .unwrap_or(ProtocolVersion::V_2025_06_18.as_str())
         .to_string();
-    let modern = !ProtocolVersion::KNOWN_VERSIONS.iter().any(|v| v.as_str() == version)
-        || !known(&version).has_initialize();
+    // Versions newer than this SDK knows are treated as 2026-07-28 or later.
+    let modern = known(&version).is_none_or(|v| !v.has_initialize());
 
     let result: Result<Value, (i64, String)> = match method {
         "initialize" => {
             let asked = params["protocolVersion"].as_str().unwrap_or("");
-            let chosen = if known(asked).has_initialize() && is_known(asked) {
-                known(asked)
-            } else {
-                ProtocolVersion::LATEST_WITH_INITIALIZE
-            };
+            let chosen = known(asked)
+                .filter(ProtocolVersion::has_initialize)
+                .unwrap_or(ProtocolVersion::LATEST_WITH_INITIALIZE);
             let result = InitializeResult::new(capabilities())
                 .with_protocol_version(chosen)
                 .with_server_info(server_info());
@@ -63,11 +63,19 @@ pub fn handle(msg: &Value, header_version: Option<&str>, routines: &[Value]) -> 
         )
         .unwrap()),
         "ping" => Ok(json!({})),
-        "tools/list" => Ok(serde_json::to_value(ListToolsResult::with_all_items(vec![list_routines_tool()])).unwrap()),
+        "tools/list" => {
+            Ok(
+                serde_json::to_value(ListToolsResult::with_all_items(vec![list_routines_tool()]))
+                    .unwrap(),
+            )
+        }
         "tools/call" => match params["name"].as_str() {
             Some("list_routines") => {
                 let text = serde_json::to_string_pretty(routines).unwrap();
-                Ok(serde_json::to_value(CallToolResult::success(vec![ContentBlock::text(text)])).unwrap())
+                Ok(
+                    serde_json::to_value(CallToolResult::success(vec![ContentBlock::text(text)]))
+                        .unwrap(),
+                )
             }
             _ => Err((-32602, "unknown tool".into())),
         },
@@ -76,20 +84,18 @@ pub fn handle(msg: &Value, header_version: Option<&str>, routines: &[Value]) -> 
     Some(match result {
         Ok(v) if modern => reply(id, v),
         Ok(v) => reply(id, legacy(v)),
-        Err((code, message)) => json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } }),
+        Err((code, message)) => {
+            json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
+        }
     })
 }
 
-fn is_known(v: &str) -> bool {
-    ProtocolVersion::KNOWN_VERSIONS.iter().any(|k| k.as_str() == v)
-}
-
-fn known(v: &str) -> ProtocolVersion {
+/// The protocol version named `v`, if this SDK knows it.
+fn known(v: &str) -> Option<ProtocolVersion> {
     ProtocolVersion::KNOWN_VERSIONS
         .iter()
         .find(|k| k.as_str() == v)
         .cloned()
-        .unwrap_or(ProtocolVersion::LATEST)
 }
 
 /// Older revisions don't have the 2026-07-28 result fields.

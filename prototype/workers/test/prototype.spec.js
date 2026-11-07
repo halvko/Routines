@@ -129,6 +129,10 @@ test("5. an MCP tool behind the hand-rolled OAuth flow", async ({ request, baseU
   expect(reg.status()).toBe(201);
   const { client_id } = await reg.json();
 
+  // The tool's data, made here so this test doesn't lean on test 4.
+  const routine = `For MCP ${Date.now()}`;
+  expect((await page.request.post("/api/routines", { data: { name: routine } })).ok()).toBe(true);
+
   // Authorize in the signed-in browser, PKCE S256.
   const verifier = b64url(randomBytes(32));
   const challenge = b64url(createHash("sha256").update(verifier).digest());
@@ -150,25 +154,46 @@ test("5. an MCP tool behind the hand-rolled OAuth flow", async ({ request, baseU
     await page.waitForURL((u) => !u.pathname.startsWith("/authorize"));
     return new URL(req.url());
   };
-  let redirected = await allow();
+  const redirected = await allow();
   expect(redirected.searchParams.get("state")).toBe(state);
   expect(redirected.searchParams.get("iss")).toBe(as.issuer);
-  const code = redirected.searchParams.get("code");
+
+  // /authorize never redirects to a URI the client didn't register.
+  const unregistered = new URL(authorize);
+  unregistered.searchParams.set("redirect_uri", "https://claude.ai/api/mcp/auth_callback");
+  const refused = await page.request.get(unregistered.href, { maxRedirects: 0 });
+  expect(refused.status()).toBe(400);
+  expect(await refused.text()).toContain("not registered");
 
   const token = (form) => request.post(as.token_endpoint, { form });
-  const wrong = await token({ grant_type: "authorization_code", code, client_id, redirect_uri: redirected.origin + "/callback", code_verifier: b64url(randomBytes(32)) });
-  expect(wrong.status()).toBe(400); // wrong verifier, and the code is now spent
-  // Run the flow again with the right verifier.
-  redirected = await allow();
-  const tokens = await (await token({
-    grant_type: "authorization_code", code: redirected.searchParams.get("code"), client_id,
-    redirect_uri: authorize.searchParams.get("redirect_uri"), code_verifier: verifier,
-  })).json();
+  const redeem = async (overrides) => {
+    const res = await token({
+      grant_type: "authorization_code", client_id, redirect_uri: authorize.searchParams.get("redirect_uri"),
+      code_verifier: verifier, ...overrides,
+    });
+    return { status: res.status(), body: await res.json() };
+  };
+  // A failed redemption spends the code: the right verifier is too late.
+  const code = redirected.searchParams.get("code");
+  expect((await redeem({ code, code_verifier: b64url(randomBytes(32)) })).status).toBe(400);
+  expect(await redeem({ code })).toEqual({ status: 400, body: { error: "invalid_grant" } });
+  // A different redirect URI or resource than the one authorized.
+  const otherRedirect = await redeem({ code: (await allow()).searchParams.get("code"), redirect_uri: CALLBACK });
+  expect(otherRedirect).toEqual({ status: 400, body: { error: "invalid_grant" } });
+  const otherResource = await redeem({ code: (await allow()).searchParams.get("code"), resource: `${baseURL}/other` });
+  expect(otherResource).toEqual({ status: 400, body: { error: "invalid_target" } });
+
+  const { status, body: tokens } = await redeem({ code: (await allow()).searchParams.get("code") });
+  expect(status).toBe(200);
   expect(tokens.token_type).toBe("Bearer");
 
   // MCP, initialize-era (2025-11-25).
-  const rpc = (body, headers = {}) =>
-    request.post("/mcp", { data: body, headers: { authorization: `Bearer ${tokens.access_token}`, ...headers } });
+  const rpcWith = (accessToken, body, headers = {}) =>
+    request.post("/mcp", { data: body, headers: { authorization: `Bearer ${accessToken}`, ...headers } });
+  const rpc = (body, headers) => rpcWith(tokens.access_token, body, headers);
+  const ping = { jsonrpc: "2.0", id: 0, method: "ping" };
+  expect((await rpcWith("garbage", ping)).status()).toBe(401);
+  expect((await rpcWith(`${user}.${b64url(randomBytes(32))}`, ping)).status()).toBe(401);
   const init = await (await rpc({
     jsonrpc: "2.0", id: 1, method: "initialize",
     params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "test", version: "0" } },
@@ -181,7 +206,7 @@ test("5. an MCP tool behind the hand-rolled OAuth flow", async ({ request, baseU
   expect(list.result.tools.map((t) => t.name)).toEqual(["list_routines"]);
   expect(list.result.resultType).toBeUndefined();
   const call = await (await rpc({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "list_routines", arguments: {} } }, v)).json();
-  expect(call.result.content[0].text).toContain("Evening");
+  expect(call.result.content[0].text).toContain(routine);
 
   // MCP, 2026-07-28: no initialize, version in _meta.
   const meta = { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" } };
@@ -195,6 +220,9 @@ test("5. an MCP tool behind the hand-rolled OAuth flow", async ({ request, baseU
   expect(refreshed.access_token).toBeTruthy();
   expect((await token({ grant_type: "refresh_token", refresh_token: tokens.refresh_token, client_id })).status()).toBe(400);
   expect((await token({ grant_type: "refresh_token", refresh_token: refreshed.refresh_token, client_id })).status()).toBe(400);
+  // ...and the family's access tokens with it.
+  expect((await rpcWith(tokens.access_token, ping)).status()).toBe(401);
+  expect((await rpcWith(refreshed.access_token, ping)).status()).toBe(401);
 });
 
 test("5b. /authorize without a session sends the user to sign in first", async ({ browser, request }) => {

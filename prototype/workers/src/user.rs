@@ -43,28 +43,37 @@ impl DurableObject for UserObject {
         ] {
             sql.exec(stmt, None).expect("schema");
         }
-        Self { state, born: now_ms(), requests: Cell::new(0) }
+        Self {
+            state,
+            born: now_ms(),
+            requests: Cell::new(0),
+        }
     }
 
     async fn fetch(&self, mut req: Request) -> Result<Response> {
         self.requests.set(self.requests.get() + 1);
         let path = req.path();
         let origin = req.headers().get("x-origin")?.unwrap_or_default();
+        // The Worker passes the caller's session cookie, if any, in a header.
+        let session = req.headers().get("x-session")?.unwrap_or_default();
         if path == "/ws" {
-            return self.websocket(&req);
+            return self.websocket(&session);
         }
         let body: Value = req.json().await.unwrap_or(Value::Null);
         let result = match path.as_str() {
-            "/ping" => Ok(json!({ "born": self.born, "now": now_ms(), "requests": self.requests.get() })),
-            "/passkey/register/start" => self.register_start(&origin, &body),
+            "/ping" => {
+                Ok(json!({ "born": self.born, "now": now_ms(), "requests": self.requests.get() }))
+            }
+            "/passkey/register/start" => self.register_start(&origin, &session),
             "/passkey/register/finish" => self.register_finish(&origin, &body),
             "/passkey/login/start" => self.login_start(&origin),
             "/passkey/login/finish" => self.login_finish(&origin, &body),
-            "/session/check" => self.check_session(&body).map(|ok| json!({ "ok": ok })),
-            "/routines/list" => self.authed(&body, |s| s.list_routines()),
-            "/routines/add" => self.authed(&body, |s| s.add_routine(&body)),
-            "/oauth/code" => self.authed(&body, |s| s.issue_code(&body)),
-            "/oauth/token" => self.token(&body),
+            "/session/check" => self.check_session(&session).map(|ok| json!({ "ok": ok })),
+            "/routines/list" => self.authed(&session, |s| s.list_routines()),
+            "/routines/add" => self.authed(&session, |s| s.add_routine(&body)),
+            "/oauth/code" => self.authed(&session, |s| s.issue_code(&body)),
+            "/oauth/token/code" => self.redeem_code(&body),
+            "/oauth/token/refresh" => self.refresh(&body),
             "/mcp" => return self.mcp(&origin, &req, &body),
             _ => return Response::error("not found", 404),
         };
@@ -83,9 +92,19 @@ impl DurableObject for UserObject {
         Ok(())
     }
 
-    async fn websocket_close(&self, ws: WebSocket, code: usize, reason: String, _clean: bool) -> Result<()> {
-        // The runtime reports 1005 ("no status") here, which close() refuses.
-        let code = if code == 1005 || code == 1006 { 1000 } else { code as u16 };
+    async fn websocket_close(
+        &self,
+        ws: WebSocket,
+        code: usize,
+        reason: String,
+        _clean: bool,
+    ) -> Result<()> {
+        // The runtime reports 1005 (no status) or 1006 (abnormal), which close() refuses.
+        let code = if code == 1005 || code == 1006 {
+            1000
+        } else {
+            code as u16
+        };
         let _ = ws.close(Some(code), Some(reason));
         Ok(())
     }
@@ -124,12 +143,18 @@ impl UserObject {
     }
 
     fn user_uuid(&self) -> Res<Uuid> {
-        let rows: Vec<Row<String>> = self.sql().exec("SELECT v FROM meta WHERE k = 'uuid'", None)?.to_array()?;
+        let rows: Vec<Row<String>> = self
+            .sql()
+            .exec("SELECT v FROM meta WHERE k = 'uuid'", None)?
+            .to_array()?;
         if let Some(r) = rows.first() {
             return Uuid::parse_str(&r.v).map_err(|e| Fail(500, e.to_string()));
         }
         let id = Uuid::new_v4();
-        self.sql().exec("INSERT INTO meta (k, v) VALUES ('uuid', ?)", vec![id.to_string().into()])?;
+        self.sql().exec(
+            "INSERT INTO meta (k, v) VALUES ('uuid', ?)",
+            vec![id.to_string().into()],
+        )?;
         Ok(id)
     }
 
@@ -139,9 +164,17 @@ impl UserObject {
             id: i64,
             v: String,
         }
-        let rows: Vec<P> = self.sql().exec("SELECT id, v FROM passkeys", None)?.to_array()?;
+        let rows: Vec<P> = self
+            .sql()
+            .exec("SELECT id, v FROM passkeys", None)?
+            .to_array()?;
         rows.into_iter()
-            .map(|r| Ok((r.id, serde_json::from_str(&r.v).map_err(|e| Fail(500, e.to_string()))?)))
+            .map(|r| {
+                Ok((
+                    r.id,
+                    serde_json::from_str(&r.v).map_err(|e| Fail(500, e.to_string()))?,
+                ))
+            })
             .collect()
     }
 
@@ -157,10 +190,16 @@ impl UserObject {
     fn take_ceremony<T: serde::de::DeserializeOwned>(&self, kind: &str) -> Res<T> {
         let rows: Vec<Row<String>> = self
             .sql()
-            .exec("SELECT v FROM ceremonies WHERE kind = ? AND expires > ?", vec![kind.into(), (now_ms() as i64).into()])?
+            .exec(
+                "SELECT v FROM ceremonies WHERE kind = ? AND expires > ?",
+                vec![kind.into(), (now_ms() as i64).into()],
+            )?
             .to_array()?;
-        self.sql().exec("DELETE FROM ceremonies WHERE kind = ?", vec![kind.into()])?;
-        let row = rows.first().ok_or_else(|| Fail(400, "no ceremony in progress".into()))?;
+        self.sql()
+            .exec("DELETE FROM ceremonies WHERE kind = ?", vec![kind.into()])?;
+        let row = rows
+            .first()
+            .ok_or_else(|| Fail(400, "no ceremony in progress".into()))?;
         serde_json::from_str(&row.v).map_err(|e| Fail(500, e.to_string()))
     }
 
@@ -168,22 +207,30 @@ impl UserObject {
         let token = new_token(&self.user());
         self.sql().exec(
             "INSERT INTO sessions (hash, expires) VALUES (?, ?)",
-            vec![sha256_b64(&token).into(), ((now_ms() + SESSION_TTL_MS) as i64).into()],
+            vec![
+                sha256_b64(&token).into(),
+                ((now_ms() + SESSION_TTL_MS) as i64).into(),
+            ],
         )?;
         Ok(token)
     }
 
-    fn check_session(&self, body: &Value) -> Res<bool> {
-        let Some(token) = body["session"].as_str() else { return Ok(false) };
+    fn check_session(&self, token: &str) -> Res<bool> {
+        if token.is_empty() {
+            return Ok(false);
+        }
         let rows: Vec<Row<i64>> = self
             .sql()
-            .exec("SELECT expires AS v FROM sessions WHERE hash = ?", vec![sha256_b64(token).into()])?
+            .exec(
+                "SELECT expires AS v FROM sessions WHERE hash = ?",
+                vec![sha256_b64(token).into()],
+            )?
             .to_array()?;
         Ok(rows.first().is_some_and(|r| r.v as u64 > now_ms()))
     }
 
-    fn authed(&self, body: &Value, f: impl FnOnce(&Self) -> Res<Value>) -> Res<Value> {
-        if !self.check_session(body)? {
+    fn authed(&self, session: &str, f: impl FnOnce(&Self) -> Res<Value>) -> Res<Value> {
+        if !self.check_session(session)? {
             return fail(401, "not signed in");
         }
         f(self)
@@ -191,10 +238,10 @@ impl UserObject {
 
     // ---- Passkeys -------------------------------------------------------
 
-    fn register_start(&self, origin: &str, body: &Value) -> Res<Value> {
+    fn register_start(&self, origin: &str, session: &str) -> Res<Value> {
         let existing = self.passkeys()?;
         // Adding a passkey to an account that has one needs a session.
-        if !existing.is_empty() && !self.check_session(body)? {
+        if !existing.is_empty() && !self.check_session(session)? {
             return fail(403, "this user already has a passkey; sign in first");
         }
         let exclude = existing.iter().map(|(_, p)| p.cred_id().clone()).collect();
@@ -209,8 +256,8 @@ impl UserObject {
 
     fn register_finish(&self, origin: &str, body: &Value) -> Res<Value> {
         let state: PasskeyRegistration = self.take_ceremony("register")?;
-        let cred: RegisterPublicKeyCredential =
-            serde_json::from_value(body["credential"].clone()).map_err(|e| Fail(400, e.to_string()))?;
+        let cred: RegisterPublicKeyCredential = serde_json::from_value(body["credential"].clone())
+            .map_err(|e| Fail(400, e.to_string()))?;
         let passkey = self
             .webauthn(origin)?
             .finish_passkey_registration(&cred, &state)
@@ -238,8 +285,8 @@ impl UserObject {
 
     fn login_finish(&self, origin: &str, body: &Value) -> Res<Value> {
         let state: PasskeyAuthentication = self.take_ceremony("login")?;
-        let cred: PublicKeyCredential =
-            serde_json::from_value(body["credential"].clone()).map_err(|e| Fail(400, e.to_string()))?;
+        let cred: PublicKeyCredential = serde_json::from_value(body["credential"].clone())
+            .map_err(|e| Fail(400, e.to_string()))?;
         let result = self
             .webauthn(origin)?
             .finish_passkey_authentication(&cred, &state)
@@ -264,8 +311,14 @@ impl UserObject {
             name: String,
             created: i64,
         }
-        let rows: Vec<R> = self.sql().exec("SELECT id, name, created FROM routines ORDER BY id", None)?.to_array()?;
-        Ok(rows.into_iter().map(|r| serde_json::to_value(r).unwrap()).collect())
+        let rows: Vec<R> = self
+            .sql()
+            .exec("SELECT id, name, created FROM routines ORDER BY id", None)?
+            .to_array()?;
+        Ok(rows
+            .into_iter()
+            .map(|r| serde_json::to_value(r).unwrap())
+            .collect())
     }
 
     fn list_routines(&self) -> Res<Value> {
@@ -285,7 +338,8 @@ impl UserObject {
         // Push to every connected device. The sockets were accepted with the
         // hibernation API, so this works even after the object was evicted
         // from memory and woken by this request.
-        let msg = json!({ "type": "routines", "routines": routines, "born": self.born }).to_string();
+        let msg =
+            json!({ "type": "routines", "routines": routines, "born": self.born }).to_string();
         let sockets = self.state.get_websockets();
         for ws in &sockets {
             let _ = ws.send_with_str(&msg);
@@ -293,9 +347,8 @@ impl UserObject {
         Ok(json!({ "routines": routines, "pushedTo": sockets.len() }))
     }
 
-    fn websocket(&self, req: &Request) -> Result<Response> {
-        let session = req.headers().get("x-session")?.unwrap_or_default();
-        if !self.check_session(&json!({ "session": session })).unwrap_or(false) {
+    fn websocket(&self, session: &str) -> Result<Response> {
+        if !self.check_session(session).unwrap_or(false) {
             return Response::error("not signed in", 401);
         }
         let pair = WebSocketPair::new()?;
@@ -313,78 +366,109 @@ impl UserObject {
         });
         self.sql().exec(
             "INSERT INTO oauth_codes (hash, v, expires) VALUES (?, ?, ?)",
-            vec![sha256_b64(&code).into(), grant.to_string().into(), ((now_ms() + CODE_TTL_MS) as i64).into()],
+            vec![
+                sha256_b64(&code).into(),
+                grant.to_string().into(),
+                ((now_ms() + CODE_TTL_MS) as i64).into(),
+            ],
         )?;
         Ok(json!({ "code": code }))
     }
 
-    /// `POST /token`, both grants. Errors are OAuth's `invalid_grant`.
-    fn token(&self, body: &Value) -> Res<Value> {
+    /// `POST /token` with `grant_type=authorization_code`. Errors are
+    /// OAuth's `invalid_grant`, or `invalid_target` for a wrong `resource`.
+    fn redeem_code(&self, body: &Value) -> Res<Value> {
         let invalid = || fail(400, "invalid_grant");
         let client_id = body["client_id"].as_str().unwrap_or("");
-        match body["grant_type"].as_str() {
-            Some("authorization_code") => {
-                let code = body["code"].as_str().unwrap_or("");
-                let hash = sha256_b64(code);
-                let rows: Vec<Row<String>> = self
-                    .sql()
-                    .exec("SELECT v FROM oauth_codes WHERE hash = ? AND expires > ?", vec![hash.clone().into(), (now_ms() as i64).into()])?
-                    .to_array()?;
-                // Single use: delete before checking anything else.
-                self.sql().exec("DELETE FROM oauth_codes WHERE hash = ?", vec![hash.into()])?;
-                let Some(row) = rows.first() else { return invalid() };
-                let grant: Value = serde_json::from_str(&row.v).unwrap();
-                let verifier = body["code_verifier"].as_str().unwrap_or("");
-                if grant["client_id"] != client_id
-                    || grant["redirect_uri"].as_str() != body["redirect_uri"].as_str()
-                    || verifier.len() < 43
-                    || grant["challenge"].as_str() != Some(&pkce_s256(verifier))
-                {
-                    return invalid();
-                }
-                let resource = grant["resource"].as_str().unwrap_or("");
-                let scope = grant["scope"].as_str().unwrap_or("");
-                self.issue_tokens(client_id, resource, scope, &random_secret())
-            }
-            Some("refresh_token") => {
-                let token = body["refresh_token"].as_str().unwrap_or("");
-                let hash = sha256_b64(token);
-                #[derive(Deserialize)]
-                struct T {
-                    family: String,
-                    client_id: String,
-                    resource: String,
-                    scope: String,
-                    expires: i64,
-                    used: i64,
-                }
-                let rows: Vec<T> = self
+        let code = body["code"].as_str().unwrap_or("");
+        let hash = sha256_b64(code);
+        let rows: Vec<Row<String>> = self
+            .sql()
+            .exec(
+                "SELECT v FROM oauth_codes WHERE hash = ? AND expires > ?",
+                vec![hash.clone().into(), (now_ms() as i64).into()],
+            )?
+            .to_array()?;
+        // Single use: delete before checking anything else.
+        self.sql()
+            .exec("DELETE FROM oauth_codes WHERE hash = ?", vec![hash.into()])?;
+        let Some(row) = rows.first() else {
+            return invalid();
+        };
+        let grant: Value = serde_json::from_str(&row.v).unwrap();
+        let verifier = body["code_verifier"].as_str().unwrap_or("");
+        if grant["client_id"] != client_id
+            || grant["redirect_uri"].as_str() != body["redirect_uri"].as_str()
+            || verifier.len() < 43
+            || grant["challenge"].as_str() != Some(&pkce_s256(verifier))
+        {
+            return invalid();
+        }
+        let resource = grant["resource"].as_str().unwrap_or("");
+        // RFC 8707: a resource named here must be the one authorized.
+        if body["resource"].as_str().is_some_and(|r| r != resource) {
+            return fail(400, "invalid_target");
+        }
+        let scope = grant["scope"].as_str().unwrap_or("");
+        self.issue_tokens(client_id, resource, scope, &random_secret())
+    }
+
+    /// `POST /token` with `grant_type=refresh_token`: rotates the token.
+    fn refresh(&self, body: &Value) -> Res<Value> {
+        let invalid = || fail(400, "invalid_grant");
+        let client_id = body["client_id"].as_str().unwrap_or("");
+        let token = body["refresh_token"].as_str().unwrap_or("");
+        let hash = sha256_b64(token);
+        #[derive(Deserialize)]
+        struct T {
+            family: String,
+            client_id: String,
+            resource: String,
+            scope: String,
+            expires: i64,
+            used: i64,
+        }
+        let rows: Vec<T> = self
                     .sql()
                     .exec(
                         "SELECT family, client_id, resource, scope, expires, used FROM oauth_tokens WHERE hash = ? AND kind = 'refresh'",
                         vec![hash.clone().into()],
                     )?
                     .to_array()?;
-                let Some(t) = rows.first() else { return invalid() };
-                if t.used != 0 {
-                    // Reuse of a rotated refresh token: revoke the whole family.
-                    self.sql().exec("DELETE FROM oauth_tokens WHERE family = ?", vec![t.family.clone().into()])?;
-                    return invalid();
-                }
-                if t.client_id != client_id || (t.expires as u64) < now_ms() {
-                    return invalid();
-                }
-                self.sql().exec("UPDATE oauth_tokens SET used = 1 WHERE hash = ?", vec![hash.into()])?;
-                self.issue_tokens(&t.client_id, &t.resource, &t.scope, &t.family)
-            }
-            _ => fail(400, "unsupported_grant_type"),
+        let Some(t) = rows.first() else {
+            return invalid();
+        };
+        if t.used != 0 {
+            // Reuse of a rotated refresh token: revoke the whole family.
+            self.sql().exec(
+                "DELETE FROM oauth_tokens WHERE family = ?",
+                vec![t.family.clone().into()],
+            )?;
+            return invalid();
         }
+        if t.client_id != client_id || (t.expires as u64) < now_ms() {
+            return invalid();
+        }
+        self.sql().exec(
+            "UPDATE oauth_tokens SET used = 1 WHERE hash = ?",
+            vec![hash.into()],
+        )?;
+        self.issue_tokens(&t.client_id, &t.resource, &t.scope, &t.family)
     }
 
-    fn issue_tokens(&self, client_id: &str, resource: &str, scope: &str, family: &str) -> Res<Value> {
+    fn issue_tokens(
+        &self,
+        client_id: &str,
+        resource: &str,
+        scope: &str,
+        family: &str,
+    ) -> Res<Value> {
         let access = new_token(&self.user());
         let refresh = new_token(&self.user());
-        for (token, kind, ttl) in [(&access, "access", ACCESS_TTL_MS), (&refresh, "refresh", REFRESH_TTL_MS)] {
+        for (token, kind, ttl) in [
+            (&access, "access", ACCESS_TTL_MS),
+            (&refresh, "refresh", REFRESH_TTL_MS),
+        ] {
             self.sql().exec(
                 "INSERT INTO oauth_tokens (hash, kind, family, client_id, resource, scope, expires) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 vec![
@@ -417,7 +501,7 @@ impl UserObject {
 
     fn mcp(&self, origin: &str, req: &Request, body: &Value) -> Result<Response> {
         let token = req.headers().get("x-token")?.unwrap_or_default();
-        let resource = format!("{origin}/mcp");
+        let resource = mcp_resource(origin);
         if !self.access_token_ok(&token, &resource).unwrap_or(false) {
             return Response::error("invalid token", 401);
         }

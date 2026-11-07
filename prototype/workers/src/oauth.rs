@@ -16,25 +16,27 @@ const CLAUDE_CALLBACKS: [&str; 2] = [
     "https://claude.com/api/mcp/auth_callback",
 ];
 
-pub fn resource(origin: &str) -> String {
-    format!("{origin}/mcp")
-}
-
 pub fn resource_metadata_url(origin: &str) -> String {
     format!("{origin}/.well-known/oauth-protected-resource/mcp")
 }
 
-pub async fn handle(req: &mut Request, env: &Env, origin: &str, path: &str) -> Result<Option<Response>> {
+pub async fn handle(
+    req: &mut Request,
+    env: &Env,
+    origin: &str,
+    path: &str,
+) -> Result<Option<Response>> {
     let method = req.method();
     Ok(Some(match (method, path) {
-        (Method::Get, "/.well-known/oauth-protected-resource" | "/.well-known/oauth-protected-resource/mcp") => {
-            Response::from_json(&json!({
-                "resource": resource(origin),
-                "authorization_servers": [origin],
-                "scopes_supported": ["routines", "offline_access"],
-                "bearer_methods_supported": ["header"],
-            }))?
-        }
+        (
+            Method::Get,
+            "/.well-known/oauth-protected-resource" | "/.well-known/oauth-protected-resource/mcp",
+        ) => Response::from_json(&json!({
+            "resource": mcp_resource(origin),
+            "authorization_servers": [origin],
+            "scopes_supported": ["routines", "offline_access"],
+            "bearer_methods_supported": ["header"],
+        }))?,
         (Method::Get, "/.well-known/oauth-authorization-server") => Response::from_json(&json!({
             "issuer": origin,
             "authorization_endpoint": format!("{origin}/authorize"),
@@ -69,24 +71,38 @@ fn is_loopback(uri: &Url) -> bool {
 /// Redirect URIs match exactly, except that loopback ports may differ
 /// (RFC 8252 section 7.3).
 fn redirect_matches(registered: &Value, uri: &str) -> bool {
-    let Ok(asked) = Url::parse(uri) else { return false };
-    registered.as_array().into_iter().flatten().filter_map(|r| r.as_str()).any(|r| {
-        r == uri
-            || Url::parse(r).is_ok_and(|r| {
-                is_loopback(&r) && is_loopback(&asked) && r.host_str() == asked.host_str() && r.path() == asked.path()
-            })
-    })
+    let Ok(asked) = Url::parse(uri) else {
+        return false;
+    };
+    registered
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|r| r.as_str())
+        .any(|r| {
+            r == uri
+                || Url::parse(r).is_ok_and(|r| {
+                    is_loopback(&r)
+                        && is_loopback(&asked)
+                        && r.host_str() == asked.host_str()
+                        && r.path() == asked.path()
+                })
+        })
 }
 
 async fn register(req: &mut Request, env: &Env, origin: &str) -> Result<Response> {
     let Ok(mut body) = req.json::<Value>().await else {
         return json_response(&json!({ "error": "invalid_client_metadata" }), 400);
     };
-    let uris = body["redirect_uris"].as_array().cloned().unwrap_or_default();
+    let uris = body["redirect_uris"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
     let ok = !uris.is_empty()
         && uris.iter().all(|u| {
-            u.as_str()
-                .is_some_and(|u| CLAUDE_CALLBACKS.contains(&u) || Url::parse(u).is_ok_and(|u| is_loopback(&u)))
+            u.as_str().is_some_and(|u| {
+                CLAUDE_CALLBACKS.contains(&u) || Url::parse(u).is_ok_and(|u| is_loopback(&u))
+            })
         });
     if !ok {
         return json_response(&json!({ "error": "invalid_redirect_uri" }), 400);
@@ -94,7 +110,16 @@ async fn register(req: &mut Request, env: &Env, origin: &str) -> Result<Response
     body["token_endpoint_auth_method"] = json!("none");
     body["grant_types"] = json!(["authorization_code", "refresh_token"]);
     body["response_types"] = json!(["code"]);
-    let resp = call_do(env, "DIRECTORY", "directory", "/register", origin, &body, &[]).await?;
+    let resp = call_do(
+        env,
+        "DIRECTORY",
+        "directory",
+        "/register",
+        origin,
+        &body,
+        &[],
+    )
+    .await?;
     copy_json(resp, 201, &[("cache-control", "no-store")]).await
 }
 
@@ -104,7 +129,9 @@ async fn register(req: &mut Request, env: &Env, origin: &str) -> Result<Response
 /// private addresses.
 async fn client(env: &Env, origin: &str, client_id: &str) -> Result<Option<Value>> {
     if client_id.starts_with("https://") {
-        let Ok(url) = Url::parse(client_id) else { return Ok(None) };
+        let Ok(url) = Url::parse(client_id) else {
+            return Ok(None);
+        };
         let mut resp = match Fetch::Url(url).send().await {
             Ok(r) if r.status_code() == 200 => r,
             _ => return Ok(None),
@@ -113,10 +140,20 @@ async fn client(env: &Env, origin: &str, client_id: &str) -> Result<Option<Value
             Ok(d) => d,
             Err(_) => return Ok(None),
         };
-        return Ok((doc["client_id"] == client_id && doc["redirect_uris"].is_array()).then_some(doc));
+        return Ok(
+            (doc["client_id"] == client_id && doc["redirect_uris"].is_array()).then_some(doc),
+        );
     }
-    let mut resp =
-        call_do(env, "DIRECTORY", "directory", "/client", origin, &json!({ "client_id": client_id }), &[]).await?;
+    let mut resp = call_do(
+        env,
+        "DIRECTORY",
+        "directory",
+        "/client",
+        origin,
+        &json!({ "client_id": client_id }),
+        &[],
+    )
+    .await?;
     if resp.status_code() != 200 {
         return Ok(None);
     }
@@ -136,7 +173,13 @@ struct AuthParams {
     resource: Option<String>,
 }
 
-async fn authorize(req: &Request, env: &Env, origin: &str, params: &str, approve: bool) -> Result<Response> {
+async fn authorize(
+    req: &Request,
+    env: &Env,
+    origin: &str,
+    params: &str,
+    approve: bool,
+) -> Result<Response> {
     let Ok(p) = serde_urlencoded::from_str::<AuthParams>(params) else {
         return page_error("Malformed authorization request.");
     };
@@ -146,89 +189,110 @@ async fn authorize(req: &Request, env: &Env, origin: &str, params: &str, approve
     if !redirect_matches(&client["redirect_uris"], &p.redirect_uri) {
         return page_error("This redirect URI is not registered for the client.");
     }
-    // From here on, errors go back to the client.
-    let back = |error: &str| -> Result<Response> {
+    // From here on, errors go back to the client, as does the code.
+    let back = |key: &str, value: &str| -> Result<Response> {
         let mut u = Url::parse(&p.redirect_uri)?;
-        u.query_pairs_mut().append_pair("error", error).append_pair("iss", origin);
+        u.query_pairs_mut()
+            .append_pair(key, value)
+            .append_pair("iss", origin);
         if let Some(s) = &p.state {
             u.query_pairs_mut().append_pair("state", s);
         }
         Response::redirect(u)
     };
     if p.response_type != "code" {
-        return back("unsupported_response_type");
+        return back("error", "unsupported_response_type");
     }
     if p.code_challenge_method != "S256" || p.code_challenge.len() != 43 {
-        return back("invalid_request");
+        return back("error", "invalid_request");
     }
-    let expected = resource(origin);
+    let expected = mcp_resource(origin);
     if p.resource.as_deref().is_some_and(|r| r != expected) {
-        return back("invalid_target");
+        return back("error", "invalid_target");
     }
 
     let session = session_cookie(req).unwrap_or_default();
-    let signed_in = match token_user(&session) {
+    let user = token_user(&session);
+    let expired = || page_error("Your session expired. Go back and try again.");
+
+    if approve {
+        // The user's object checks the session while issuing the code.
+        let Some(user) = user else { return expired() };
+        let body = json!({
+            "client_id": p.client_id, "redirect_uri": p.redirect_uri,
+            "code_challenge": p.code_challenge, "resource": expected, "scope": p.scope,
+        });
+        let extra = [("x-session", session.as_str())];
+        let mut r = call_do(env, "USER", user, "/oauth/code", origin, &body, &extra).await?;
+        if r.status_code() == 401 {
+            return expired();
+        }
+        let v: Value = r.json().await?;
+        return match v["code"].as_str() {
+            Some(code) => back("code", code),
+            None => back("error", "server_error"),
+        };
+    }
+
+    let signed_in = match user {
         Some(user) => {
-            let mut r = call_do(env, "USER", user, "/session/check", origin, &json!({ "session": session }), &[]).await?;
+            let extra = [("x-session", session.as_str())];
+            let mut r = call_do(
+                env,
+                "USER",
+                user,
+                "/session/check",
+                origin,
+                &Value::Null,
+                &extra,
+            )
+            .await?;
             r.json::<Value>().await?["ok"] == true
         }
         None => false,
     };
     if !signed_in {
-        if approve {
-            return page_error("Your session expired. Go back and try again.");
-        }
         let mut next = Url::parse(&format!("{origin}/"))?;
-        next.query_pairs_mut().append_pair("next", &format!("/authorize?{params}"));
+        next.query_pairs_mut()
+            .append_pair("next", &format!("/authorize?{params}"));
         return Response::redirect(next);
     }
 
-    if !approve {
-        let name = client["client_name"].as_str().unwrap_or(&p.client_id);
-        let hidden: String = serde_urlencoded::from_str::<Vec<(String, String)>>(params)
-            .unwrap_or_default()
-            .iter()
-            .map(|(k, v)| format!(r#"<input type="hidden" name="{}" value="{}">"#, esc(k), esc(v)))
-            .collect();
-        return Response::from_html(format!(
-            r#"<!doctype html><meta name="viewport" content="width=device-width">
+    let name = client["client_name"].as_str().unwrap_or(&p.client_id);
+    let hidden: String = serde_urlencoded::from_str::<Vec<(String, String)>>(params)
+        .unwrap_or_default()
+        .iter()
+        .map(|(k, v)| {
+            format!(
+                r#"<input type="hidden" name="{}" value="{}">"#,
+                esc(k),
+                esc(v)
+            )
+        })
+        .collect();
+    Response::from_html(format!(
+        r#"<!doctype html><meta name="viewport" content="width=device-width">
 <title>Allow access</title><body style="font-family:system-ui;max-width:28rem;margin:2rem auto;padding:0 1rem">
 <h1>Allow {name} to read your routines?</h1>
 <form method="post" action="/authorize">{hidden}<button id="allow" type="submit">Allow</button></form>"#,
-            name = esc(name)
-        ));
-    }
-
-    let user = token_user(&session).unwrap_or_default();
-    let body = json!({
-        "session": session, "client_id": p.client_id, "redirect_uri": p.redirect_uri,
-        "code_challenge": p.code_challenge, "resource": expected, "scope": p.scope,
-    });
-    let mut r = call_do(env, "USER", user, "/oauth/code", origin, &body, &[]).await?;
-    let v: Value = r.json().await?;
-    let Some(code) = v["code"].as_str() else {
-        return back("server_error");
-    };
-    let mut u = Url::parse(&p.redirect_uri)?;
-    u.query_pairs_mut().append_pair("code", code).append_pair("iss", origin);
-    if let Some(s) = &p.state {
-        u.query_pairs_mut().append_pair("state", s);
-    }
-    Response::redirect(u)
+        name = esc(name)
+    ))
 }
 
 async fn token(req: &mut Request, env: &Env, origin: &str) -> Result<Response> {
-    let form: HashMap<String, String> = serde_urlencoded::from_str(&req.text().await?).unwrap_or_default();
-    let presented = match form.get("grant_type").map(String::as_str) {
-        Some("authorization_code") => form.get("code"),
-        Some("refresh_token") => form.get("refresh_token"),
+    let form: HashMap<String, String> =
+        serde_urlencoded::from_str(&req.text().await?).unwrap_or_default();
+    // The grant is dispatched here, once; the user's object redeems it.
+    let (presented, do_path) = match form.get("grant_type").map(String::as_str) {
+        Some("authorization_code") => (form.get("code"), "/oauth/token/code"),
+        Some("refresh_token") => (form.get("refresh_token"), "/oauth/token/refresh"),
         _ => return json_response(&json!({ "error": "unsupported_grant_type" }), 400),
     };
     let Some(user) = presented.and_then(|t| token_user(t)) else {
         return json_response(&json!({ "error": "invalid_grant" }), 400);
     };
     let body = serde_json::to_value(&form)?;
-    let resp = call_do(env, "USER", user, "/oauth/token", origin, &body, &[]).await?;
+    let resp = call_do(env, "USER", user, do_path, origin, &body, &[]).await?;
     let status = resp.status_code();
     copy_json(resp, status, &[("cache-control", "no-store")]).await
 }

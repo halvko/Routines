@@ -35,7 +35,9 @@ pub fn token_user(token: &str) -> Option<&str> {
 /// cookies, tokens and Durable Object names.
 pub fn valid_user(user: &str) -> bool {
     (1..=32).contains(&user.len())
-        && user.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        && user
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
 pub fn json_response(value: &serde_json::Value, status: u16) -> Result<Response> {
@@ -48,6 +50,11 @@ pub fn esc(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
+}
+
+/// The MCP endpoint's URL: the OAuth `resource` that tokens are bound to.
+pub fn mcp_resource(origin: &str) -> String {
+    format!("{origin}/mcp")
 }
 
 pub const SESSION_COOKIE: &str = "__Host-session";
@@ -88,7 +95,11 @@ pub async fn call_do(
 
 /// Responses from a Durable Object have immutable headers; copy one into a
 /// fresh JSON response so headers can be added.
-pub async fn copy_json(mut resp: Response, status: u16, extra: &[(&str, &str)]) -> Result<Response> {
+pub async fn copy_json(
+    mut resp: Response,
+    status: u16,
+    extra: &[(&str, &str)],
+) -> Result<Response> {
     let body = resp.text().await?;
     let mut out = Response::ok(body)?.with_status(status);
     out.headers_mut().set("content-type", "application/json")?;
