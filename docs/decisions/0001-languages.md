@@ -5,8 +5,8 @@ Accepted, 2026-11-06.
 ## Decision
 
 - **Core:** one Rust crate holding every domain rule (routines, runs, steps,
-  flags and bridging, placing, the backlog, carry-over, undo, migrations of
-  stored data, sync merging). It does no I/O and has no UI.
+  options and bridging, placing, the backlog and its to-dos, carry-over, undo,
+  migrations of stored data, sync merging). It does no I/O and has no UI.
 - **Server:** Rust. It links the core natively, so the server applies synced
   changes with exactly the rules the app uses.
 - **Web app:** React with TypeScript. It calls the core compiled to

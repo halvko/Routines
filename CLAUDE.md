@@ -6,6 +6,11 @@ product's source of truth and roadmap, and `docs/decisions/` records the
 technical decisions (Rust core and server, React + TypeScript web app) that
 the rewrite will follow.
 
+**The JavaScript app is frozen to bug fixes** until the rewrite replaces it,
+so features are not built twice. New product work goes into the issues for
+the rewrite. The one planned exception is the last release's "move to the
+new app" step (`docs/decisions/0005`).
+
 ## After making changes
 
 Always run:

@@ -14,7 +14,8 @@ Accepted, 2026-11-06, **to be confirmed by a prototype** (below).
   directory object mapping email to user. No D1 unless it turns out simpler.
 - **One origin** serves the web app, the API, sign-in and the MCP endpoint.
   Safari blocks cross-site cookies by default, so the web app moves from
-  GitHub Pages to the Worker when the server arrives.
+  GitHub Pages to the Worker when the server arrives (see "Moving to the new
+  address" below).
 - **Backups:** Durable Object point-in-time recovery (30 days) plus a nightly
   export to R2.
 - **Per-PR previews** with Worker Previews, each with its own Durable Objects.
@@ -23,6 +24,26 @@ Accepted, 2026-11-06, **to be confirmed by a prototype** (below).
   handler using `rmcp`'s protocol types (its HTTP transport needs Tokio,
   which Workers does not have). Passkeys with `webauthn-rs`, passwords with
   RustCrypto `argon2`.
+
+## Moving to the new address
+
+`localStorage` belongs to an origin, and the home-screen icon points at the
+github.io address, whose service worker keeps serving the cached old app. So
+the move is a step of its own, built before the old address is retired:
+
+1. **The last github.io release** (the frozen JavaScript app, one bug-fix
+   release) adds a "Move to the new app" banner. The new app, once signed in,
+   shows a one-time transfer code. Entering it in the old app uploads its
+   `routines.v1` data to the account, over one import endpoint that accepts
+   the github.io origin and nothing else. The import goes through the core and
+   is idempotent (0003).
+2. After a successful upload the old app **stops accepting changes** (so the
+   two copies cannot drift), points to the new address, and explains how to
+   add the new icon to the home screen and remove the old one.
+3. **Export → Import stays available** as the fallback when the upload is not
+   possible.
+4. The github.io release stays up until every device has moved; only then is
+   GitHub Pages switched off.
 
 ## The prototype that confirms it
 

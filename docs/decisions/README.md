@@ -14,8 +14,8 @@ must have backups and an export path, whatever else we try.
 
 | # | Decision | Status |
 |---|---|---|
-| [0001](0001-languages.md) | Rust for the core and the server; TypeScript + React only in the browser | Accepted |
+| [0001](0001-languages.md) | Rust for the core and the server; TypeScript + React in the browser | Accepted |
 | [0002](0002-core-interface.md) | The core is one synchronous `update(event)`, fed through one queue | Accepted |
-| [0003](0003-sync.md) | Hand-rolled sync: an outbox on the device, one ordered log per user on the server | Accepted |
+| [0003](0003-sync.md) | Hand-rolled sync: an outbox on the device, one ordered log per user | Accepted |
 | [0004](0004-auth.md) | Passkeys first, Argon2id password fallback, opaque session cookies | Accepted |
-| [0005](0005-hosting.md) | Cloudflare Workers in Rust, one Durable Object per user, Paid plan | Accepted, to be confirmed by a prototype |
+| [0005](0005-hosting.md) | The server runs on Cloudflare Workers, in Rust, on the Paid plan | Accepted, to be confirmed by a prototype |
