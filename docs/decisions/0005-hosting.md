@@ -39,7 +39,11 @@ the move is a step of its own, built before the old address is retired:
    is idempotent (0003).
 2. After a successful upload the old app **stops accepting changes** (so the
    two copies cannot drift), points to the new address, and explains how to
-   add the new icon to the home screen and remove the old one.
+   add the new icon to the home screen and remove the old one. It also offers
+   **"Keep using this app"**, which unfreezes it with its local data intact,
+   for when the new app lets the owner down that morning. The move can then be
+   retried later: uploading again is safe, because the import is idempotent
+   and merges per 0003.
 3. **Export → Import stays available** as the fallback when the upload is not
    possible.
 4. The github.io release stays up until every device has moved; only then is
