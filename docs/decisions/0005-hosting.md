@@ -45,13 +45,19 @@ the move is a step of its own, built before the old address is retired:
    retried. The old app always sends its **full snapshot** over the same
    endpoint and stores nothing extra. `routines.v1` is a bare snapshot (no
    per-field timestamps, no run events, hard deletes), so the **core on the
-   server** does the comparing: it keeps the snapshot it imported last, turns
-   the difference into ordinary changes (something missing since then becomes
-   a delete, which per 0003 is a status change), and after each successful
-   import that snapshot becomes the new base, so nothing is sent twice. Where
-   the new app changed the same thing since the last import, timing does not
-   decide: the conflict is shown to the user to resolve (0003). One import
-   path, written once in the core and testable without a browser.
+   server** does the comparing. Each device's old app has its own copy, so
+   the core keeps the last imported snapshot **per uploading device** (the
+   old app sends a device id it generates once). A device's first upload has
+   no base: it adds what is new, and anything that differs from what the
+   server already has is a conflict for the user, never a delete or an
+   overwrite. A later upload from the same device is compared with that
+   device's last import and the difference becomes ordinary changes
+   (something missing since then becomes a delete, which per 0003 is a status
+   change); then that snapshot becomes the device's new base, so nothing is
+   sent twice. Where the new app changed the same thing since that device's
+   last import, timing does not decide: the conflict is shown to the user to
+   resolve (0003). One import path, written once in the core and testable
+   without a browser.
 3. **Export → Import stays available** as the fallback when the upload is not
    possible.
 4. The github.io release stays up until every device has moved; only then is
