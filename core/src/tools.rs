@@ -4,8 +4,8 @@
 //! fields), plus read-only tools for what the app shows.
 //!
 //! A tool call becomes a change with [`change_from_tool`], and goes through
-//! the user's [`crate::Log`] like a push from any device. Its Undo goes back
-//! to Claude as a tool call ([`tool_call`]).
+//! the user's [`crate::Log`] like a push from any device. [`tool_call`] is the
+//! reverse, for handing a change's Undo back to Claude.
 
 use crate::change::Change;
 use serde::{Deserialize, Serialize};
@@ -120,9 +120,9 @@ pub fn change_from_tool(name: &str, args: Value) -> Result<Change, serde_json::E
     serde_json::from_value(Value::Object(obj))
 }
 
-/// A change as a tool call: the tool's name and its arguments. The server
-/// answers each change tool with its Undo in this form, so Claude can undo
-/// with one more call (`remove_step` hands back a `restore_step` call).
+/// A change as a tool call (name and arguments), the reverse of
+/// [`change_from_tool`]. Use it to hand a change's Undo back to Claude, e.g.
+/// `remove_step` returns a `restore_step` call.
 pub fn tool_call(change: &Change) -> (String, Value) {
     let mut args = serde_json::to_value(change).expect("a change is JSON");
     let op = args

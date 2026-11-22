@@ -208,6 +208,15 @@ fn strip_removed(v: &mut Value) {
                     if let Some(Value::Object(done)) = o.get_mut("done") {
                         done.sort_keys();
                     }
+                    // A step's dependencies are a set; Undo restores them by
+                    // set, not by position.
+                    if let Some(Value::Array(steps)) = o.get_mut("steps") {
+                        for st in steps {
+                            if let Some(Value::Array(after)) = st.get_mut("after") {
+                                after.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
+                            }
+                        }
+                    }
                 }
             }
         }
