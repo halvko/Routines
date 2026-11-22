@@ -1,0 +1,13 @@
+{
+  "name": "routines-workers-prototype",
+  "private": true,
+  "type": "module",
+  "description": "Dev tooling only (wrangler runs workerd locally). The Worker itself is Rust.",
+  "scripts": {
+    "dev": "wrangler dev --port 8787 --ip 127.0.0.1",
+    "test": "node test/e2e.mjs && node test/passkey.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.166.0"
+  }
+}

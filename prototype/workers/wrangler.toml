@@ -1,0 +1,19 @@
+name = "routines-prototype"
+main = "build/index.js"
+compatibility_date = "2026-11-01"
+
+[build]
+command = "worker-build --release"
+
+[[durable_objects.bindings]]
+name = "USER"
+class_name = "User"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["User"]
+
+# Passkeys are bound to this origin. A deploy overrides both.
+[vars]
+RP_ID = "localhost"
+RP_ORIGIN = "http://localhost:8787"
