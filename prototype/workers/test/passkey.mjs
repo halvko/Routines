@@ -41,6 +41,17 @@ try {
   const other = await page.evaluate((u) => window.signIn(u).then(() => 'signed in', (e) => e.message), `${user}-other`);
   console.log(`ok   other user refused: ${other}`);
   if (other !== '400 no passkeys') throw new Error(`expected "400 no passkeys", got: ${other}`);
+
+  // User B has a passkey of their own; A's passkey must not sign B in.
+  const userB = `${user}b`;
+  const regB = await page.evaluate((u) => window.register(u), userB);
+  if (regB.registered !== 1) throw new Error('expected one passkey for B');
+  const cross = await page.evaluate(
+    ([a, b]) => window.crossSignIn(a, b).then(() => 'signed in', (e) => e.message),
+    [user, userB],
+  );
+  console.log(`ok   A's passkey refused for B: ${cross}`);
+  if (!cross.startsWith('401 sign-in failed')) throw new Error(`expected "401 sign-in failed", got: ${cross}`);
 } catch (e) {
   failed = true;
   console.log('FAIL', e.stack || e);

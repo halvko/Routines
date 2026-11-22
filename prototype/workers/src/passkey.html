@@ -29,4 +29,16 @@
     });
     return post(`/u/${user}/passkey/login/finish`, cred.toJSON());
   };
+  // Answers B's sign-in challenge with A's credential. Must be refused.
+  window.crossSignIn = async (a, b) => {
+    const { publicKey: forA } = await post(`/u/${a}/passkey/login/start`);
+    const { publicKey: forB } = await post(`/u/${b}/passkey/login/start`);
+    const cred = await navigator.credentials.get({
+      publicKey: PublicKeyCredential.parseRequestOptionsFromJSON({
+        ...forB,
+        allowCredentials: forA.allowCredentials,
+      }),
+    });
+    return post(`/u/${b}/passkey/login/finish`, cred.toJSON());
+  };
 </script>

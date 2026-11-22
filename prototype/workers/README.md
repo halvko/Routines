@@ -14,7 +14,7 @@ clients.
 | `src/mcp.rs` | MCP over Streamable HTTP with `rmcp`'s protocol types and no Tokio. Tools `read_log` and `add_todo`; `add_todo` writes through the same log. |
 | `src/passkey.rs` | Passkey registration and sign-in with `webauthn-rs`, state kept in the user's object. |
 | `src/bench.rs` | One Argon2id hash at m=19 MiB, t=2. |
-| `patches/webauthn-rs-core` | A one-line patch: `SystemTime::now()` panics on wasm32. |
+| `patches/webauthn-rs-core` | `webauthn-rs-core` 0.6.2, vendored whole (Cargo's `[patch]` needs a full copy) with one change: `SystemTime::now()` panics on wasm32. |
 
 Auth is a stub: sync routes take the user from the path, MCP from
 `Authorization: Bearer dev-<user>`. Real sessions and Claude's OAuth flow
@@ -36,7 +36,6 @@ CI runs the same in `.github/workflows/prototype-workers.yml`.
 
 Everything in the log is a *change*. On the wire it is a `mutation` when a
 device pushes it and an `event` once the log has numbered it.
-
 
 - `POST /u/<user>/push` `{clientId, mutations: [{clientSeq, name, args}]}` →
   `{results: [{clientSeq, seq, duplicate}], lastSeq}`
