@@ -29,7 +29,8 @@ pub struct Annotations {
 }
 
 /// Read-only tools: name and description. Their answers are
-/// [`crate::today`], [`crate::open_backlog`] and the live routines.
+/// [`crate::today`], [`crate::open_backlog`], the live routines and
+/// [`crate::deleted`].
 pub const READ_TOOLS: &[(&str, &str)] = &[
     (
         "today",
@@ -43,17 +44,10 @@ pub const READ_TOOLS: &[(&str, &str)] = &[
         "routines",
         "Every routine with its steps, what each step comes after, and the options (flags) it can be started with.",
     ),
-];
-
-/// Changes that take something away. Deleting and abandoning can be undone
-/// with the matching `restore_…` tool; removing a step cannot.
-const DESTRUCTIVE: &[&str] = &[
-    "deleteRoutine",
-    "removeStep",
-    "removeDep",
-    "abandonRun",
-    "unpullItem",
-    "deleteItem",
+    (
+        "deleted",
+        "Deleted routines and to-dos and abandoned runs, newest first, with when and by which device. Bring one back with restore_routine, restore_todo or restore_run.",
+    ),
 ];
 
 /// Every tool, read-only ones first.
@@ -76,6 +70,8 @@ pub fn tools() -> Vec<Tool> {
         let op = variant["properties"]["op"]["const"]
             .as_str()
             .expect("every change has an op");
+        // Set on the variant with `#[schemars(extend("x-destructive" = true))]`.
+        let destructive = variant.get("x-destructive") == Some(&Value::Bool(true));
         let mut props = variant["properties"]
             .as_object()
             .cloned()
@@ -104,7 +100,7 @@ pub fn tools() -> Vec<Tool> {
             input_schema: Value::Object(schema),
             annotations: Annotations {
                 read_only_hint: false,
-                destructive_hint: DESTRUCTIVE.contains(&op),
+                destructive_hint: destructive,
             },
         });
     }

@@ -34,6 +34,9 @@ struct Case {
     /// A subset of `open_backlog()` after the last step.
     #[serde(default)]
     backlog: Option<Value>,
+    /// A subset of `deleted()` after the last step.
+    #[serde(default)]
+    deleted: Option<Value>,
 }
 
 #[derive(Deserialize)]
@@ -155,6 +158,9 @@ fn run(case: &Case) -> Result<(), String> {
             &serde_json::to_value(open_backlog(&db)).unwrap(),
             "backlog",
         )?;
+    }
+    if let Some(e) = &case.deleted {
+        subset(e, &serde_json::to_value(deleted(&db)).unwrap(), "deleted")?;
     }
     // Saved data loads back as the same.
     let again: Db = serde_json::from_value(as_json).map_err(|e| format!("reload: {e}"))?;

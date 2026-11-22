@@ -199,19 +199,28 @@ pub struct BacklogItem {
     pub extra: Extra,
 }
 
+/// How Today lists steps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum TodayMode {
+    /// One list across every running routine.
+    Mixed,
+    /// One section per running routine.
+    Grouped,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Prefs {
-    /// `"mixed"` or `"grouped"`.
     #[serde(rename = "todayMode", default, skip_serializing_if = "Option::is_none")]
-    pub today_mode: Option<String>,
+    pub today_mode: Option<TodayMode>,
     #[serde(flatten)]
     pub extra: Extra,
 }
 
 /// Deleting a routine or a to-do, or abandoning a run, never erases it: it
 /// gets this mark, which syncs like any other field, and can be taken off
-/// again (decision 0003). Everything that reads runs and routines skips
-/// removed ones.
+/// again, so a removal on one device and an edit on another both survive
+/// sync. Everything that reads runs and routines skips removed ones.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Removed {
     /// Milliseconds since the epoch.

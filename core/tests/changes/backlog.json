@@ -5,8 +5,8 @@
       "name": "a to-do needs a title, and its title is trimmed",
       "start": "seed",
       "steps": [
-        {"change": {"op": "addItem", "title": "   "}, "rejected": {"reason": "emptyTitle"}},
-        {"change": {"op": "addItem", "title": "  Buy milk  "}, "ok": {"created": "dev-2", "change": {"item": "dev-2", "title": "Buy milk"}, "undo": {"op": "deleteItem", "item": "dev-2"}}}
+        {"change": {"op": "addTodo", "title": "   "}, "rejected": {"reason": "emptyTitle"}},
+        {"change": {"op": "addTodo", "title": "  Buy milk  "}, "ok": {"created": "dev-2", "change": {"todo": "dev-2", "title": "Buy milk"}, "undo": {"op": "deleteTodo", "todo": "dev-2"}}}
       ],
       "expected": {"backlog": [{"id": "dev-2", "title": "Buy milk", "starred": false, "createdAt": 2000, "doneAt": null, "runId": null}]}
     },
@@ -14,11 +14,11 @@
       "name": "the backlog lists starred to-dos first, then the newest",
       "start": "seed",
       "steps": [
-        {"change": {"op": "addItem", "item": "a", "title": "A"}},
-        {"change": {"op": "addItem", "item": "b", "title": "B", "starred": true}},
-        {"change": {"op": "addItem", "item": "c", "title": "C"}},
-        {"change": {"op": "addItem", "item": "d", "title": "D"}},
-        {"change": {"op": "completeItem", "item": "d", "done": true}, "ok": {"undo": {"op": "completeItem", "done": false}}}
+        {"change": {"op": "addTodo", "todo": "a", "title": "A"}},
+        {"change": {"op": "addTodo", "todo": "b", "title": "B", "starred": true}},
+        {"change": {"op": "addTodo", "todo": "c", "title": "C"}},
+        {"change": {"op": "addTodo", "todo": "d", "title": "D"}},
+        {"change": {"op": "completeTodo", "todo": "d", "done": true}, "ok": {"undo": {"op": "completeTodo", "done": false}}}
       ],
       "backlog": [{"id": "b"}, {"id": "c"}, {"id": "a"}]
     },
@@ -26,10 +26,10 @@
       "name": "starring, renaming and undoing them",
       "start": "seed",
       "steps": [
-        {"change": {"op": "addItem", "item": "a", "title": "A"}},
-        {"change": {"op": "starItem", "item": "a", "starred": true}, "ok": {"undo": {"op": "starItem", "starred": false}}},
-        {"change": {"op": "renameItem", "item": "a", "title": "  "}, "rejected": {"reason": "emptyTitle"}},
-        {"change": {"op": "renameItem", "item": "a", "title": "Call mum"}, "ok": {"undo": {"op": "renameItem", "title": "A"}}}
+        {"change": {"op": "addTodo", "todo": "a", "title": "A"}},
+        {"change": {"op": "starTodo", "todo": "a", "starred": true}, "ok": {"undo": {"op": "starTodo", "starred": false}}},
+        {"change": {"op": "renameTodo", "todo": "a", "title": "  "}, "rejected": {"reason": "emptyTitle"}},
+        {"change": {"op": "renameTodo", "todo": "a", "title": "Call mum"}, "ok": {"undo": {"op": "renameTodo", "title": "A"}}}
       ],
       "expected": {"backlog": [{"id": "a", "title": "Call mum", "starred": true}]}
     },
@@ -37,9 +37,9 @@
       "name": "pulling a to-do into Today makes a one-step run for it",
       "start": "seed",
       "steps": [
-        {"change": {"op": "addItem", "item": "a", "title": "Call the dentist"}},
-        {"change": {"op": "pullItem", "item": "a", "run": "t"}, "ok": {"created": "t", "undo": {"op": "unpullItem", "item": "a"}}},
-        {"change": {"op": "pullItem", "item": "a"}, "rejected": {"reason": "alreadyInToday"}}
+        {"change": {"op": "addTodo", "todo": "a", "title": "Call the dentist"}},
+        {"change": {"op": "pullTodo", "todo": "a", "run": "t"}, "ok": {"created": "t", "undo": {"op": "unpullTodo", "todo": "a"}}},
+        {"change": {"op": "pullTodo", "todo": "a"}, "rejected": {"reason": "alreadyInToday"}}
       ],
       "expected": {
         "backlog": [{"id": "a", "runId": "t"}],
@@ -55,8 +55,8 @@
       "name": "ticking a to-do in Today finishes it in the backlog too, and unticking reopens it",
       "start": "seed",
       "steps": [
-        {"change": {"op": "addItem", "item": "a", "title": "A"}},
-        {"change": {"op": "pullItem", "item": "a", "run": "t"}},
+        {"change": {"op": "addTodo", "todo": "a", "title": "A"}},
+        {"change": {"op": "pullTodo", "todo": "a", "run": "t"}},
         {"change": {"op": "markStep", "run": "t", "step": "task", "mark": "done"}, "ok": {"finished": ["t"]}}
       ],
       "expected": {"backlog": [{"id": "a", "doneAt": 3000}], "runs": {"t": {"finishedAt": 3000}}},
@@ -66,8 +66,8 @@
       "name": "unticking a to-do in Today reopens it in the backlog",
       "start": "seed",
       "steps": [
-        {"change": {"op": "addItem", "item": "a", "title": "A"}},
-        {"change": {"op": "pullItem", "item": "a", "run": "t"}},
+        {"change": {"op": "addTodo", "todo": "a", "title": "A"}},
+        {"change": {"op": "pullTodo", "todo": "a", "run": "t"}},
         {"change": {"op": "markStep", "run": "t", "step": "task", "mark": "done"}},
         {"change": {"op": "markStep", "run": "t", "step": "task", "mark": null}}
       ],
@@ -78,21 +78,21 @@
       "name": "finishing a to-do from the backlog finishes its run in Today, and undoing reopens both",
       "start": "seed",
       "steps": [
-        {"change": {"op": "addItem", "item": "a", "title": "A"}},
-        {"change": {"op": "pullItem", "item": "a", "run": "t"}},
-        {"change": {"op": "completeItem", "item": "a", "done": true}, "ok": {"finished": ["t"], "undo": {"op": "completeItem", "item": "a", "done": false}}}
+        {"change": {"op": "addTodo", "todo": "a", "title": "A"}},
+        {"change": {"op": "pullTodo", "todo": "a", "run": "t"}},
+        {"change": {"op": "completeTodo", "todo": "a", "done": true}, "ok": {"finished": ["t"], "undo": {"op": "completeTodo", "todo": "a", "done": false}}}
       ],
       "expected": {"backlog": [{"id": "a", "doneAt": 3000}], "runs": {"t": {"finishedAt": 3000, "done": {"task": "done"}}}},
       "today": {"running": []}
     },
     {
-      "name": "taking a to-do out of Today keeps the to-do and drops its run",
+      "name": "taking a to-do out of Today keeps the to-do and drops its run; doing it again changes nothing",
       "start": "seed",
       "steps": [
-        {"change": {"op": "addItem", "item": "a", "title": "A"}},
-        {"change": {"op": "pullItem", "item": "a", "run": "t"}},
-        {"change": {"op": "unpullItem", "item": "a"}, "ok": {"undo": {"op": "restoreRun", "run": "t"}}},
-        {"change": {"op": "unpullItem", "item": "a"}, "rejected": {"reason": "notInToday"}}
+        {"change": {"op": "addTodo", "todo": "a", "title": "A"}},
+        {"change": {"op": "pullTodo", "todo": "a", "run": "t"}},
+        {"change": {"op": "unpullTodo", "todo": "a"}, "ok": {"undo": {"op": "restoreRun", "run": "t"}}},
+        {"change": {"op": "unpullTodo", "todo": "a"}, "ok": {"undo": null}}
       ],
       "expected": {"backlog": [{"id": "a", "runId": null, "removed": null}], "runs": {"t": {"removed": {"at": 3000}}}},
       "today": {"running": []},
@@ -102,11 +102,11 @@
       "name": "deleting a to-do that is in Today takes it out of Today; restoring brings both back",
       "start": "seed",
       "steps": [
-        {"change": {"op": "addItem", "item": "a", "title": "A"}},
-        {"change": {"op": "pullItem", "item": "a", "run": "t"}},
-        {"change": {"op": "deleteItem", "item": "a"}, "ok": {"undo": {"op": "restoreItem", "item": "a"}}},
-        {"change": {"op": "starItem", "item": "a", "starred": true}, "rejected": {"reason": "removed", "kind": "item"}},
-        {"change": {"op": "restoreItem", "item": "a"}}
+        {"change": {"op": "addTodo", "todo": "a", "title": "A"}},
+        {"change": {"op": "pullTodo", "todo": "a", "run": "t"}},
+        {"change": {"op": "deleteTodo", "todo": "a"}, "ok": {"undo": {"op": "restoreTodo", "todo": "a"}}},
+        {"change": {"op": "starTodo", "todo": "a", "starred": true}, "rejected": {"reason": "removed", "kind": "todo"}},
+        {"change": {"op": "restoreTodo", "todo": "a"}}
       ],
       "expected": {"backlog": [{"id": "a", "runId": "t", "removed": null}], "runs": {"t": {"removed": null}}},
       "today": {"running": [{"run": "t"}]}
@@ -115,12 +115,16 @@
       "name": "deleting a to-do's run from Today deletes the to-do; restoring the run brings it back",
       "start": "seed",
       "steps": [
-        {"change": {"op": "addItem", "item": "a", "title": "A"}},
-        {"change": {"op": "pullItem", "item": "a", "run": "t"}},
+        {"change": {"op": "addTodo", "todo": "a", "title": "A"}},
+        {"change": {"op": "pullTodo", "todo": "a", "run": "t"}},
         {"change": {"op": "abandonRun", "run": "t"}}
       ],
       "expected": {"backlog": [{"id": "a", "removed": {"at": 3000, "by": "dev"}}], "runs": {"t": {"removed": {"at": 3000}}}},
       "backlog": []
-    }
+    },
+    {"name": "deleting a to-do twice (say, on two devices) is the same as once", "start": "seed", "steps": [{"change": {"op": "addTodo", "todo": "a", "title": "A"}}, {"change": {"op": "deleteTodo", "todo": "a"}}, {"change": {"op": "deleteTodo", "todo": "a"}, "ok": {"undo": null}}], "expected": {"backlog": [{"id": "a", "removed": {"at": 2000}}]}, "deleted": [{"kind": "todo", "id": "a", "name": "A", "at": 2000, "by": "dev"}]},
+    {"name": "an Undo of taking a to-do out of Today is refused once it is back in Today another way", "start": "seed", "steps": [{"change": {"op": "addTodo", "todo": "a", "title": "A"}}, {"change": {"op": "pullTodo", "todo": "a", "run": "t1"}}, {"change": {"op": "unpullTodo", "todo": "a"}}, {"change": {"op": "pullTodo", "todo": "a", "run": "t2"}}, {"change": {"op": "restoreRun", "run": "t1"}, "rejected": {"reason": "alreadyInToday"}}], "today": {"running": [{"run": "t2"}]}},
+    {"name": "an Undo of taking a to-do out of Today does not bring back a to-do deleted since", "start": "seed", "steps": [{"change": {"op": "addTodo", "todo": "a", "title": "A"}}, {"change": {"op": "pullTodo", "todo": "a", "run": "t1"}}, {"change": {"op": "unpullTodo", "todo": "a"}}, {"change": {"op": "deleteTodo", "todo": "a"}}, {"change": {"op": "restoreRun", "run": "t1"}, "rejected": {"reason": "removed", "kind": "todo", "id": "a"}}], "deleted": [{"kind": "todo", "id": "a", "at": 4000}, {"kind": "run", "id": "t1", "at": 3000}]},
+    {"name": "a to-do and its run deleted together are listed once, as the to-do", "start": "seed", "steps": [{"change": {"op": "addTodo", "todo": "a", "title": "A"}}, {"change": {"op": "pullTodo", "todo": "a", "run": "t"}}, {"change": {"op": "deleteTodo", "todo": "a"}}], "deleted": [{"kind": "todo", "id": "a", "name": "A"}]}
   ]
 }

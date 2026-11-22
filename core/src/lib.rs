@@ -8,10 +8,12 @@
 //!   (`tests/vectors/`), whose expected results come from the JavaScript.
 //! - [`Change`] and [`apply`]: every way the data can change, as plain data,
 //!   applied the same way on a device and on the server.
-//! - [`Client`] and [`Log`]: the device and server sides of sync (decision
-//!   0003). [`Client::update`] is the core's one entry point on a device
-//!   (decision 0002): an [`Event`] in, [`Effect`]s out.
-//! - [`today`], [`open_backlog`]: what the screens and MCP read.
+//! - [`Client`] and [`Log`]: the device and server sides of sync: an
+//!   outbox on each device, one ordered log per user on the server.
+//!   [`Client::update`] is the core's one entry point on a device: an
+//!   [`Event`] in, [`Effect`]s out, never waiting and doing no I/O.
+//!   (Decisions 0002 and 0003 in `docs/decisions/`, arriving with PR #2.)
+//! - [`today`], [`open_backlog`], [`deleted`]: what the screens and MCP read.
 //! - [`tools`]: the MCP tools, generated from [`Change`].
 
 mod change;
@@ -26,7 +28,7 @@ mod types;
 mod view;
 
 pub use change::{
-    Applied, Change, Kind, Placement, Rejected, Stamp, TodayMode, apply, live_routines, live_runs,
+    Applied, Change, Kind, Placement, Rejected, Rewired, Stamp, apply, live_routines, live_runs,
 };
 pub use cond::{Term, collect_flags, cond_holds, parse_cond};
 pub use editor::{includes, would_cycle};
@@ -38,4 +40,4 @@ pub use seed::seed;
 pub use sync::{Client, Effect, Envelope, Event, Log, LogEntry, Saved};
 pub use tools::{Annotations, READ_TOOLS, Tool, change_from_tool, tools};
 pub use types::*;
-pub use view::{RunningRun, Today, TodayStep, open_backlog, today};
+pub use view::{DeletedThing, RunningRun, Today, TodayStep, deleted, open_backlog, today};

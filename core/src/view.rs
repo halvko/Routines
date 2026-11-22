@@ -122,3 +122,54 @@ pub fn open_backlog(db: &Db) -> Vec<&BacklogItem> {
     });
     items
 }
+
+/// Something deleted or abandoned, which a `restore…` change brings back.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DeletedThing {
+    pub kind: crate::change::Kind,
+    pub id: String,
+    /// Its name or title.
+    pub name: String,
+    /// Milliseconds since the epoch.
+    pub at: i64,
+    /// The device that removed it.
+    pub by: String,
+}
+
+/// Deleted routines and to-dos and abandoned runs, newest first. A to-do's
+/// run removed together with its to-do is listed once, as the to-do.
+pub fn deleted(db: &Db) -> Vec<DeletedThing> {
+    use crate::change::Kind;
+    let thing = |kind, id: &str, name: &str, r: &Removed| DeletedThing {
+        kind,
+        id: id.to_string(),
+        name: name.to_string(),
+        at: r.at,
+        by: r.by.clone(),
+    };
+    let todo_removed = |run: &Run| {
+        run.backlog_id.as_ref().and_then(|t| {
+            db.backlog
+                .iter()
+                .find(|i| &i.id == t)
+                .and_then(|i| i.removed.as_ref())
+        })
+    };
+    let mut out: Vec<DeletedThing> = db
+        .routines
+        .values()
+        .filter_map(|r| Some(thing(Kind::Routine, &r.id, &r.name, r.removed.as_ref()?)))
+        .chain(db.runs.values().filter_map(|r| {
+            let gone = r.removed.as_ref()?;
+            (todo_removed(r) != Some(gone)).then(|| thing(Kind::Run, &r.id, &r.name, gone))
+        }))
+        .chain(
+            db.backlog
+                .iter()
+                .filter_map(|t| Some(thing(Kind::Todo, &t.id, &t.title, t.removed.as_ref()?))),
+        )
+        .collect();
+    out.sort_by_key(|d| std::cmp::Reverse(d.at));
+    out
+}

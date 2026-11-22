@@ -1,4 +1,5 @@
-//! Sync between devices (decision 0003), as plain state machines with no I/O.
+//! Sync between devices, as plain state machines with no I/O (decision
+//! 0003, `docs/decisions/0003-sync.md`, arriving with PR #2).
 //!
 //! - A device keeps a [`Client`]: the state as of the last change it pulled
 //!   from the server (the *base*), plus an *outbox* of its own changes the
@@ -79,10 +80,13 @@ impl Default for Log {
 
 impl Log {
     /// Take one pushed change. Returns the entry to store and announce, or
-    /// `None` if this change was taken before (a retry).
+    /// `None` if it is not taken now: a change taken before (a retry), or one
+    /// that arrives before an earlier change from the same device. A device
+    /// numbers its changes 1, 2, 3, … and resends its whole outbox in order,
+    /// so a skipped change comes again, in its place.
     pub fn push(&mut self, envelope: Envelope) -> Option<LogEntry> {
         let seen = self.seen.entry(envelope.client.clone()).or_insert(0);
-        if envelope.seq <= *seen {
+        if envelope.seq != *seen + 1 {
             return None;
         }
         *seen = envelope.seq;
@@ -106,6 +110,9 @@ impl Log {
 }
 
 /// Something that happened, for [`Client::update`].
+// Events are handled one at a time and never stored in bulk, so a large
+// `Change` inline costs nothing worth boxing it for.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(
     tag = "type",
@@ -213,14 +220,12 @@ impl Client {
     }
 
     /// Handle one event. Never waits and never does I/O; the shell carries
-    /// out the effects and reports results as new events (decision 0002).
+    /// out the effects and reports results as new events, so `update` never
+    /// runs inside itself (decision 0002, arriving with PR #2).
     pub fn update(&mut self, event: Event) -> Vec<Effect> {
         match event {
             Event::Change { at, change } => self.change(at, change),
-            Event::Connected => vec![self.push(), self.pull()]
-                .into_iter()
-                .flatten()
-                .collect(),
+            Event::Connected => self.push().into_iter().chain([self.pull()]).collect(),
             Event::Pulled { entries } => self.pulled(entries),
             Event::Dismiss { n } => {
                 let before = self.saved.notices.len();
@@ -263,10 +268,10 @@ impl Client {
         })
     }
 
-    fn pull(&self) -> Option<Effect> {
-        Some(Effect::Pull {
+    fn pull(&self) -> Effect {
+        Effect::Pull {
             after: self.saved.base_n,
-        })
+        }
     }
 
     fn pulled(&mut self, entries: Vec<LogEntry>) -> Vec<Effect> {
@@ -279,7 +284,7 @@ impl Client {
             }
             // A gap: something in between went missing; ask again.
             if e.n != self.saved.base_n + 1 {
-                fx.extend(self.pull());
+                fx.push(self.pull());
                 break;
             }
             if e.rejected.is_none() {

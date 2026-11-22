@@ -134,7 +134,7 @@ fn offline_changes_on_both_devices_both_survive() {
     laptop.act(
         &mut s,
         12,
-        json!({"op": "addItem", "item": "milk", "title": "Buy milk"}),
+        json!({"op": "addTodo", "todo": "milk", "title": "Buy milk"}),
     );
     assert_eq!(
         s.entries.len(),
@@ -157,7 +157,7 @@ fn offline_changes_on_both_devices_both_survive() {
 }
 
 #[test]
-fn edits_to_different_fields_both_survive_and_the_same_field_takes_the_later_one() {
+fn edits_to_different_fields_of_one_step_both_survive() {
     let mut s = Server::default();
     let (mut phone, mut laptop) = (Device::new("phone"), Device::new("laptop"));
     phone.online = false;
@@ -172,11 +172,27 @@ fn edits_to_different_fields_both_survive_and_the_same_field_takes_the_later_one
         2,
         json!({"op": "setStepWhen", "routine": "breakfast", "step": "coffee", "when": "home"}),
     );
+    phone.sync(&mut s);
+    laptop.sync(&mut s);
+    phone.sync(&mut s);
+    let step = &phone.client.state().routines["breakfast"].steps[0];
+    assert_eq!(step.title.as_deref(), Some("Tea"));
+    assert_eq!(step.when.as_deref(), Some("home"));
+    assert_eq!(laptop.client.state(), phone.client.state());
+}
+
+#[test]
+fn edits_to_the_same_field_keep_the_one_the_server_took_last_not_the_latest_clock() {
+    let mut s = Server::default();
+    let (mut phone, mut laptop) = (Device::new("phone"), Device::new("laptop"));
+    phone.online = false;
+    laptop.online = false;
     laptop.act(
         &mut s,
         3,
         json!({"op": "renameRoutine", "routine": "breakfast", "name": "Laptop"}),
     );
+    // Made later by the clock, but reaches the server first.
     phone.act(
         &mut s,
         4,
@@ -185,11 +201,7 @@ fn edits_to_different_fields_both_survive_and_the_same_field_takes_the_later_one
     phone.sync(&mut s);
     laptop.sync(&mut s);
     phone.sync(&mut s);
-    let r = &phone.client.state().routines["breakfast"];
-    assert_eq!(r.steps[0].title.as_deref(), Some("Tea"));
-    assert_eq!(r.steps[0].when.as_deref(), Some("home"));
-    // The server orders the changes; the one it took last wins.
-    assert_eq!(r.name, "Laptop");
+    assert_eq!(phone.client.state().routines["breakfast"].name, "Laptop");
     assert_eq!(laptop.client.state(), phone.client.state());
 }
 
@@ -242,7 +254,7 @@ fn a_change_that_no_longer_fits_is_kept_as_a_notice_never_dropped() {
 fn a_refused_local_change_changes_nothing_and_is_not_sent() {
     let mut s = Server::default();
     let mut phone = Device::new("phone");
-    phone.act(&mut s, 1, json!({"op": "addItem", "title": "  "}));
+    phone.act(&mut s, 1, json!({"op": "addTodo", "title": "  "}));
     assert_eq!(phone.shown, vec![Effect::Refused(Rejected::EmptyTitle)]);
     assert!(s.entries.is_empty());
     assert_eq!(
@@ -260,12 +272,12 @@ fn pushing_the_same_changes_twice_is_safe() {
     phone.act(
         &mut s,
         1,
-        json!({"op": "addItem", "item": "a", "title": "A"}),
+        json!({"op": "addTodo", "todo": "a", "title": "A"}),
     );
     phone.act(
         &mut s,
         2,
-        json!({"op": "starItem", "item": "a", "starred": true}),
+        json!({"op": "starTodo", "todo": "a", "starred": true}),
     );
     let outbox = phone.client.saved().outbox.clone();
     s.push(outbox.clone());
@@ -277,6 +289,58 @@ fn pushing_the_same_changes_twice_is_safe() {
 }
 
 #[test]
+fn a_change_pushed_before_an_earlier_one_waits_for_it() {
+    let mut s = Server::default();
+    let mut phone = Device::new("phone");
+    phone.online = false;
+    phone.act(
+        &mut s,
+        1,
+        json!({"op": "addTodo", "todo": "a", "title": "A"}),
+    );
+    phone.act(
+        &mut s,
+        2,
+        json!({"op": "starTodo", "todo": "a", "starred": true}),
+    );
+    let outbox = phone.client.saved().outbox.clone();
+    // The first push was lost; the second change arrives alone.
+    s.push(vec![outbox[1].clone()]);
+    assert!(s.entries.is_empty(), "not taken before change 1");
+    // The device resends its whole outbox, in order: both are taken.
+    phone.sync(&mut s);
+    assert_eq!(s.entries.len(), 2);
+    assert_eq!(s.log.db.backlog[0].starred, Some(true));
+    assert_eq!(phone.client.state(), &s.log.db);
+}
+
+#[test]
+fn an_entry_that_does_not_apply_on_this_device_becomes_a_notice() {
+    // The server applied it, but this device (on an older version, say)
+    // cannot: it is kept as a notice, not dropped.
+    let mut tablet = Client::new("tablet");
+    let entry = LogEntry {
+        n: 1,
+        envelope: Envelope {
+            client: "phone".into(),
+            seq: 1,
+            at: 1,
+            change: change(json!({"op": "markStep", "run": "nope", "step": "x", "mark": "done"})),
+        },
+        rejected: None,
+    };
+    let fx = tablet.update(Event::Pulled {
+        entries: vec![entry],
+    });
+    assert!(matches!(&fx[..], [Effect::Save, Effect::Notice(e)] if e.rejected.is_some()));
+    assert_eq!(tablet.notices().len(), 1);
+    assert_eq!(tablet.saved().base_n, 1, "it still moves past the entry");
+    // Dismissing a notice that is not there changes nothing.
+    assert!(tablet.update(Event::Dismiss { n: 99 }).is_empty());
+    assert_eq!(tablet.update(Event::Dismiss { n: 1 }), vec![Effect::Save]);
+}
+
+#[test]
 fn a_stale_or_gappy_pull_is_handled() {
     let mut s = Server::default();
     let (mut phone, mut laptop) = (Device::new("phone"), Device::new("laptop"));
@@ -284,7 +348,7 @@ fn a_stale_or_gappy_pull_is_handled() {
         phone.act(
             &mut s,
             i,
-            json!({"op": "addItem", "title": format!("T{i}")}),
+            json!({"op": "addTodo", "title": format!("T{i}")}),
         );
     }
     // An old reply arriving late changes nothing.
@@ -336,7 +400,7 @@ fn a_device_carries_on_from_what_it_saved() {
     phone.act(
         &mut s,
         1,
-        json!({"op": "addItem", "item": "a", "title": "A"}),
+        json!({"op": "addTodo", "todo": "a", "title": "A"}),
     );
     let saved: Saved =
         serde_json::from_value(serde_json::to_value(phone.client.saved()).unwrap()).unwrap();
@@ -365,7 +429,7 @@ fn claude_through_mcp_is_one_more_client() {
     assert_eq!(today["doNow"][0]["title"], "Get out of bed");
     let calls = [
         (
-            "add_item",
+            "add_todo",
             json!({"title": "Book flights", "starred": true}),
         ),
         (

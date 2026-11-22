@@ -163,9 +163,9 @@
       "start": "seed",
       "steps": [
         {"change": {"op": "startRun", "run": "m", "routine": "morning", "flags": {"gym": false}}},
-        {"change": {"op": "pullItem", "item": "x"}, "rejected": {"reason": "notFound", "kind": "item"}},
-        {"change": {"op": "addItem", "item": "call", "title": "Call the dentist"}},
-        {"change": {"op": "pullItem", "item": "call", "run": "t", "place": {"rel": "before", "run": "m", "step": "wake"}}}
+        {"change": {"op": "pullTodo", "todo": "x"}, "rejected": {"reason": "notFound", "kind": "todo"}},
+        {"change": {"op": "addTodo", "todo": "call", "title": "Call the dentist"}},
+        {"change": {"op": "pullTodo", "todo": "call", "run": "t", "place": {"rel": "before", "run": "m", "step": "wake"}}}
       ],
       "today": {
         "doNow": [{"run": "t", "runName": "Call the dentist", "step": "task", "from": null}],
@@ -191,7 +191,7 @@
       "steps": [
         {"change": {"op": "startRun", "run": "a", "routine": "breakfast"}},
         {"change": {"op": "startRun", "run": "b", "routine": "breakfast", "place": {"rel": "after", "run": "a", "step": "clean"}}},
-        {"change": {"op": "pullItem", "item": "nope"}, "rejected": {"reason": "notFound"}},
+        {"change": {"op": "pullTodo", "todo": "nope"}, "rejected": {"reason": "notFound"}},
         {"change": {"op": "startRun", "run": "c", "routine": "breakfast", "place": {"rel": "after", "run": "c", "step": "clean"}}, "rejected": {"reason": "placedOnItself"}},
         {"change": {"op": "startRun", "run": "c", "routine": "breakfast", "place": {"rel": "after", "run": "a", "step": "nope"}}, "rejected": {"reason": "notFound", "kind": "step"}}
       ],
@@ -268,6 +268,10 @@
         {"change": {"op": "startRun", "run": "y", "routine": "breakfast", "nodes": []}, "rejected": {"reason": "invalidSnapshot"}}
       ],
       "expected": {"runs": {"x": {"nodes": [{"id": "a"}, {"id": "b"}]}}}
-    }
+    },
+    {"name": "abandoning a run twice is the same as once", "start": "seed", "steps": [{"change": {"op": "startRun", "run": "b", "routine": "breakfast"}}, {"change": {"op": "abandonRun", "run": "b"}}, {"change": {"op": "abandonRun", "run": "b"}, "ok": {"undo": null}}], "expected": {"runs": {"b": {"removed": {"at": 2000}}}}, "deleted": [{"kind": "run", "id": "b", "name": "Breakfast", "at": 2000, "by": "dev"}]},
+    {"name": "restoring a run that would close a loop of placements is refused", "start": "seed", "steps": [{"change": {"op": "startRun", "run": "r3", "routine": "breakfast"}}, {"change": {"op": "startRun", "run": "r2", "routine": "breakfast", "place": {"rel": "after", "run": "r3", "step": "clean"}}}, {"change": {"op": "startRun", "run": "r1", "routine": "breakfast", "place": {"rel": "after", "run": "r2", "step": "clean"}}}, {"change": {"op": "abandonRun", "run": "r2"}}, {"change": {"op": "placeRun", "run": "r3", "place": {"rel": "after", "run": "r1", "step": "clean"}}}, {"change": {"op": "restoreRun", "run": "r2"}, "rejected": {"reason": "placementLoop"}}], "expected": {"runs": {"r2": {"removed": {"at": 4000}}}}},
+    {"name": "a run started on a device keeps its name and steps when the routine was renamed meanwhile", "start": "seed", "steps": [{"change": {"op": "renameRoutine", "routine": "breakfast", "name": "Brunch"}}, {"change": {"op": "startRun", "run": "b", "routine": "breakfast", "name": "Breakfast", "nodes": [{"id": "coffee", "title": "Start the coffee", "deps": [], "source": "Breakfast"}]}}], "expected": {"runs": {"b": {"name": "Breakfast"}}, "routines": {"breakfast": {"lastFlags": {}}}}, "today": {"doNow": [{"step": "coffee", "runName": "Breakfast", "from": null}]}},
+    {"name": "a run started on a device survives the routine being deleted meanwhile", "start": "seed", "steps": [{"change": {"op": "deleteRoutine", "routine": "travel"}}, {"change": {"op": "startRun", "run": "t", "routine": "travel", "name": "Travel", "nodes": [{"id": "clothes", "title": "Clothes", "deps": [], "source": "Travel"}]}}, {"change": {"op": "markStep", "run": "t", "step": "clothes", "mark": "done"}, "ok": {"finished": ["t"]}}], "expected": {"runs": {"t": {"name": "Travel", "finishedAt": 3000}}, "routines": {"travel": {"lastFlags": null}}}}
   ]
 }

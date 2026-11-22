@@ -9,6 +9,8 @@ Living document of where Routines is heading. Decisions marked ✅ are built.
 - **Routines nest.** A step can be a whole other routine. ✅
 - **Flags are the templating.** Steps (and dependencies) can be "only if `gym`" / `!gym`; flags are chosen when starting a run. Hidden steps are bridged so dependencies still flow. ✅
 - **Runs are snapshots.** Editing a routine never rewrites a run already started. ✅
+- **Every device is equal, and Claude is one more.** Each change is applied on the device at once, works offline, and syncs through the server; Claude's changes through MCP go the same way. (Rust core; the server and app come next.)
+- **Nothing is lost by syncing.** Deleting or abandoning never erases: it can always be restored, and a list of deleted things makes that possible later. A change made offline that no longer fits (say, ticking a step of a run abandoned on another device) is never dropped quietly: it shows as a quiet notice to look at when convenient.
 - **Routines all the way down.** The day itself is a routine; everything else attaches to it.
 
 ## Build order
@@ -42,7 +44,7 @@ Some routines span days. Travel: check in online (usually before packing starts)
 
 - Rewrite in TypeScript once the shape has settled. Plain JS (no build step) is deliberate for now, to keep experimenting cheap.
 - Backend + login so it can be edited from a computer (phone stays the main entry point).
-- **MCP server** on that backend, so Claude can be connected as an integration and manipulate tasks directly: read Today, add to the backlog, tick/drop steps, start and place routines, draft/edit routines. Needs the backend (data must live somewhere Claude can reach) and auth. Same tool surface the AI drafting feature would use.
+- **MCP server** on that backend, so Claude can be connected as an integration and manipulate tasks directly: read Today, add to the backlog, tick/drop steps, start and place routines, draft/edit routines. Needs the backend (data must live somewhere Claude can reach) and auth. Same tool surface the AI drafting feature would use. The tool list is built (Rust core: one tool per change, plus reading Today, the backlog, routines and deleted things); the endpoint and sign-in come with the server.
 - AI drafting: "I need to do X" → suggested routine you then edit. Needs the backend to keep the API key off the phone.
 - Companion runs: a flag spawns linked routines already attached (starting Morning with `gym` also spawns Pack gym bag + After gym).
 - Day templating by weekday (weekend flag set automatically, etc.).
