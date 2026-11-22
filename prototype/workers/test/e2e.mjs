@@ -196,15 +196,18 @@ await check('Argon2id (m=19 MiB, t=2) runs inside the runtime', async () => {
     const t0 = performance.now();
     const res = await fetch(`${base}${path}`);
     const body = await res.text();
-    return { ms: performance.now() - t0, body };
+    return { ms: performance.now() - t0, status: res.status, body };
   };
   const noop = [], hash = [];
   let last;
   for (let i = 0; i < 5; i++) {
     noop.push((await time('/bench/noop')).ms);
     const h = await time('/bench/argon2');
+    assert.equal(h.status, 200, h.body);
     hash.push(h.ms);
     last = JSON.parse(h.body);
+    assert.equal(last.params, 'argon2id m=19456 t=2 p=1');
+    assert.match(last.hashPrefix, /^[0-9a-f]{8}$/);
   }
   const med = (a) => a.sort((x, y) => x - y)[Math.floor(a.length / 2)];
   return `median round trip ${Math.round(med(hash))} ms vs ${Math.round(med(noop))} ms no-op; in-request ${last.inRequestMs} ms`;

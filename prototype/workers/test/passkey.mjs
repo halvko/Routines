@@ -40,7 +40,7 @@ try {
   // A sign-in for another user (no passkeys there) must not succeed.
   const other = await page.evaluate((u) => window.signIn(u).then(() => 'signed in', (e) => e.message), `${user}-other`);
   console.log(`ok   other user refused: ${other}`);
-  if (other === 'signed in') throw new Error('other user signed in');
+  if (other !== '400 no passkeys') throw new Error(`expected "400 no passkeys", got: ${other}`);
 } catch (e) {
   failed = true;
   console.log('FAIL', e.stack || e);

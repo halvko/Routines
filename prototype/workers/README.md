@@ -34,6 +34,10 @@ CI runs the same in `.github/workflows/prototype-workers.yml`.
 
 ## API
 
+Everything in the log is a *change*. On the wire it is a `mutation` when a
+device pushes it and an `event` once the log has numbered it.
+
+
 - `POST /u/<user>/push` `{clientId, mutations: [{clientSeq, name, args}]}` →
   `{results: [{clientSeq, seq, duplicate}], lastSeq}`
 - `GET /u/<user>/pull?after=N&limit=M` → `{events, lastSeq}`

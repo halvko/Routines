@@ -5,14 +5,16 @@
 use serde::{Deserialize, Serialize};
 use worker::*;
 
-#[derive(Deserialize)]
+/// Wire shapes of the object's internal API, shared with `mcp.rs` so both
+/// sides change together.
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PushRequest {
     pub client_id: String,
     pub mutations: Vec<Mutation>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Mutation {
     /// The device's own counter. `None` asks the server to take the client's
@@ -55,6 +57,14 @@ pub struct Event {
 pub struct PullResponse {
     pub events: Vec<Event>,
     pub last_seq: i64,
+}
+
+/// Default page size for pull, for devices and MCP alike.
+pub const PULL_LIMIT: i64 = 500;
+
+/// The object's URL for a pull, used by the router's callers inside the Worker.
+pub fn pull_url(after: i64, limit: i64) -> String {
+    format!("https://user/pull?after={after}&limit={limit}")
 }
 
 #[derive(Deserialize)]
@@ -114,11 +124,11 @@ impl DurableObject for User {
             }
             (Method::Get, "/pull") => {
                 let mut after = 0;
-                let mut limit = 500;
+                let mut limit = PULL_LIMIT;
                 for (k, v) in url.query_pairs() {
                     match &*k {
                         "after" => after = v.parse().unwrap_or(0),
-                        "limit" => limit = v.parse::<i64>().unwrap_or(500).clamp(1, 1000),
+                        "limit" => limit = v.parse::<i64>().unwrap_or(PULL_LIMIT).clamp(1, 1000),
                         _ => {}
                     }
                 }
@@ -136,7 +146,10 @@ impl DurableObject for User {
                 Response::from_websocket(pair.client)
             }
             (Method::Post, path) if path.starts_with("/passkey/") => {
-                let user = self.state.id().name().unwrap_or_default();
+                // Objects are only ever addressed by name (the user id).
+                let Some(user) = self.state.id().name() else {
+                    return Response::error("object has no name", 500);
+                };
                 let step = path.trim_start_matches("/passkey/").to_string();
                 crate::passkey::handle(&self.state, &self.env, &user, req, &step).await
             }
@@ -189,7 +202,22 @@ impl User {
             // This is where the server runs the shared core on the change
             // (0003). The prototype stores it as given.
             let client_seq = match m.client_seq {
-                Some(n) => n,
+                Some(n) => {
+                    let existing = sql
+                        .exec(
+                            "SELECT seq AS n FROM log WHERE client_id = ? AND client_seq = ?",
+                            vec![body.client_id.as_str().into(), n.into()],
+                        )?
+                        .to_array::<Num>()?;
+                    if let Some(Num { n: Some(seq) }) = existing.into_iter().next() {
+                        results.push(PushResult { client_seq: n, seq, duplicate: true });
+                        continue;
+                    }
+                    n
+                }
+                // Server-numbered (MCP): a fresh number, so never a duplicate.
+                // A retried MCP call therefore appends twice; the real server
+                // needs an idempotency key per tool call (see the findings).
                 None => {
                     sql.exec(
                         "SELECT MAX(client_seq) AS n FROM log WHERE client_id = ?",
@@ -201,16 +229,6 @@ impl User {
                         + 1
                 }
             };
-            let existing = sql
-                .exec(
-                    "SELECT seq AS n FROM log WHERE client_id = ? AND client_seq = ?",
-                    vec![body.client_id.as_str().into(), client_seq.into()],
-                )?
-                .to_array::<Num>()?;
-            if let Some(Num { n: Some(seq) }) = existing.into_iter().next() {
-                results.push(PushResult { client_seq, seq, duplicate: true });
-                continue;
-            }
             let seq = sql
                 .exec(
                     "INSERT INTO log (client_id, client_seq, name, args, at)

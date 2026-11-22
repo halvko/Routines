@@ -7,9 +7,10 @@ are first class**.
 ## Recommendation
 
 **Keep Cloudflare Workers in Rust (0005).** Everything sync and MCP need ran
-on the real Workers runtime (`workerd`, locally) on the first day, in about
-600 lines of Rust, with two small wasm32 snags, both fixed. Nothing fought
-back for anywhere near the "weekend" budget 0005 set.
+on the real Workers runtime (`workerd`, locally) in about 600 lines of Rust,
+built and tested in roughly an hour and a half. Two problems showed up at
+runtime, both small and fixed or worked around (below), far inside the
+"weekend" budget 0005 set.
 
 **Fallback: AWS Lambda + DynamoDB + API Gateway WebSockets**, as the owner
 prefers, instead of Fly.io. It costs more glue code than Fly (per-user
@@ -35,25 +36,37 @@ scripts; CI runs them on every PR that touches the prototype.
 | 4. One MCP tool Claude can call | **Works without OAuth.** `rmcp` 3.11's protocol types, no transport, no Tokio. Both protocol eras: `initialize` (2025-11-25) and `server/discover` (2026-07-28). `add_todo` writes through the same log, so Claude's change pokes the user's devices like a phone's would; `read_log` sees every device's changes. OAuth is still to build. | e2e, 6 checks |
 | 5. Worker Previews for Rust | **Not tried**: needs a Cloudflare account. | — |
 
+**Open point for the real server:** a device's change carries its own
+`clientSeq`, so a retry is recognized. An MCP tool call has no such
+counter: the server numbers it, so a retried `add_todo` is stored twice.
+The real server needs an idempotency key per tool call.
+
 Why this makes sync and MCP first class: the user's Durable Object is the
 **one door** for every write. A device push and an MCP tool call go through
 the same function, get numbers from the same counter, and trigger the same
 poke. There is no second write path for MCP to drift from, and the core
 (0002) plugs in at one marked spot (`User::push`).
 
-## Snags found (all small)
+## What came up
+
+Two runtime problems:
 
 1. **`webauthn-rs-core` 0.6.2 calls `SystemTime::now()`**, which panics on
    wasm32. It compiled fine (the earlier research could only show that);
    it failed at runtime on the first registration. Fixed with a one-line
    `[patch]` taking the time from `js_sys::Date::now()`
-   (`prototype/workers/patches/`). Worth upstreaming; a clock parameter
-   would do.
+   (`prototype/workers/patches/`). The crate is vendored there whole
+   (about 11,000 lines, unchanged except that line and one `js-sys`
+   dependency) because Cargo's `[patch]` needs a full copy. Worth
+   upstreaming; a clock parameter would do.
 2. **A panic inside a Durable Object aborts the instance, and the request
    hangs** until the client gives up (seen with the bug above). The server
    must not panic: no `unwrap`/`expect` on request paths, a clippy lint for
    it, and every handler returning `Result`. Building with workers-rs's
    panic-unwind option is worth trying in the real server.
+
+Three minor build notes:
+
 3. **Randomness on wasm32** needs features switched on: `getrandom`'s
    `wasm_js` and `uuid`'s `js` (for `rmcp`). One line each.
 4. **No `transactionSync` wrapper** in workers-rs. Not needed: SQL calls

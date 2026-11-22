@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use worker::*;
 use worker::{Request, Response, Result};
 
-use crate::user::{PullResponse, PushResponse};
+use crate::user::{Mutation, PULL_LIMIT, PullResponse, PushRequest, PushResponse, pull_url};
 
 /// The client id MCP writes use in the sync log.
 const MCP_CLIENT: &str = "mcp";
@@ -127,7 +127,7 @@ fn tools() -> Vec<Tool> {
                 "type": "object",
                 "properties": {
                     "after": { "type": "integer", "description": "Return entries after this number. Default 0." },
-                    "limit": { "type": "integer", "description": "At most this many entries. Default 50." }
+                    "limit": { "type": "integer", "description": "At most this many entries. Default 500." }
                 }
             })),
         ),
@@ -153,8 +153,8 @@ async fn call_tool(
     match name {
         "read_log" => {
             let after = args.get("after").and_then(Value::as_i64).unwrap_or(0);
-            let limit = args.get("limit").and_then(Value::as_i64).unwrap_or(50);
-            let url = format!("https://user/pull?after={after}&limit={limit}");
+            let limit = args.get("limit").and_then(Value::as_i64).unwrap_or(PULL_LIMIT);
+            let url = pull_url(after, limit);
             let pulled: PullResponse = crate::user_stub(env, user)
                 .map_err(internal)?
                 .fetch_with_str(&url)
@@ -170,16 +170,20 @@ async fn call_tool(
             let Some(title) = args.get("title").and_then(Value::as_str) else {
                 return Ok(CallToolResult::error(vec![ContentBlock::text("title is required")]));
             };
-            let body = json!({
-                "clientId": MCP_CLIENT,
-                "mutations": [{ "clientSeq": null, "name": "addTodo", "args": { "title": title } }]
-            });
+            let body = PushRequest {
+                client_id: MCP_CLIENT.into(),
+                mutations: vec![Mutation {
+                    client_seq: None,
+                    name: "addTodo".into(),
+                    args: json!({ "title": title }),
+                }],
+            };
             let mut init = RequestInit::new();
             let headers = Headers::new();
             headers.set("Content-Type", "application/json").map_err(internal)?;
             init.with_method(Method::Post)
                 .with_headers(headers)
-                .with_body(Some(body.to_string().into()));
+                .with_body(Some(serde_json::to_string(&body).unwrap_or_default().into()));
             let req = Request::new_with_init("https://user/push", &init).map_err(internal)?;
             let pushed: PushResponse = crate::user_stub(env, user)
                 .map_err(internal)?

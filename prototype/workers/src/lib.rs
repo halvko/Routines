@@ -21,8 +21,8 @@ mod user;
 
 pub use user::User;
 
-/// The user a request acts for. Stub: a bearer token `dev-<user>`, or the
-/// `/u/<user>/` path segment for the sync routes.
+/// The user an MCP request acts for. Stub: a bearer token `dev-<user>`.
+/// (The sync routes take the user from the `/u/<user>/` path instead.)
 fn user_from_bearer(req: &Request) -> Option<String> {
     let header = req.headers().get("Authorization").ok().flatten()?;
     let user = header.strip_prefix("Bearer dev-")?;
