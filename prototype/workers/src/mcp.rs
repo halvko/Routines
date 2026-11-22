@@ -198,7 +198,9 @@ async fn call_tool(
                 .json()
                 .await
                 .map_err(internal)?;
-            let seq = pushed.results.first().map(|r| r.seq).unwrap_or(0);
+            let seq = pushed.results.first().map(|r| r.seq).ok_or_else(|| {
+                ErrorData::internal_error("push returned no result", None)
+            })?;
             Ok(CallToolResult::success(vec![ContentBlock::text(format!(
                 "Added \"{title}\" as change #{seq}."
             ))]))
