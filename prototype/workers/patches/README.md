@@ -1,0 +1,1 @@
+webauthn-rs-core 0.6.2 from crates.io with one change in src/core.rs: on wasm32 the registration time comes from js_sys::Date::now(), because std's SystemTime::now() panics on wasm32-unknown-unknown. Search for 'PATCH (Routines prototype)'. To upstream before a real server depends on it.

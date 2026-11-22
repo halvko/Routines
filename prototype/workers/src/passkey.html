@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Passkey test</title>
+<p>Passkey test page for the prototype. Driven by <code>test/passkey.mjs</code>.</p>
+<script>
+  // Browser-side half of the ceremony. Uses the WebAuthn JSON helpers
+  // (parse*OptionsFromJSON / toJSON) so no base64 code is needed here.
+  async function post(path, body) {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : '{}',
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`${res.status} ${text}`);
+    return JSON.parse(text);
+  }
+  window.register = async (user) => {
+    const { publicKey } = await post(`/u/${user}/passkey/register/start`);
+    const cred = await navigator.credentials.create({
+      publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(publicKey),
+    });
+    return post(`/u/${user}/passkey/register/finish`, cred.toJSON());
+  };
+  window.signIn = async (user) => {
+    const { publicKey } = await post(`/u/${user}/passkey/login/start`);
+    const cred = await navigator.credentials.get({
+      publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(publicKey),
+    });
+    return post(`/u/${user}/passkey/login/finish`, cred.toJSON());
+  };
+</script>

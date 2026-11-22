@@ -1,0 +1,31 @@
+[package]
+name = "routines-workers-prototype"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+worker = "0.9.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rmcp = { version = "3.11.0", default-features = false, features = ["server"] }
+argon2 = "0.6.0"
+# State is kept in the Durable Object between start and finish, so it must serialize.
+webauthn-rs = { version = "0.6.2", features = ["danger-allow-state-serialisation"] }
+getrandom = { version = "0.4", features = ["wasm_js"] }
+console_error_panic_hook = "0.1"
+# Only to give rmcp's uuid a randomness source on wasm32.
+uuid = { version = "1", features = ["js"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+
+# webauthn-rs-core 0.6.2 calls SystemTime::now(), which panics on wasm32.
+# One-line patch; see patches/README.md.
+[patch.crates-io]
+webauthn-rs-core = { path = "patches/webauthn-rs-core" }
