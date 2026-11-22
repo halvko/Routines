@@ -163,7 +163,8 @@ async fn call_tool(
                 .json()
                 .await
                 .map_err(internal)?;
-            let text = serde_json::to_string_pretty(&pulled).unwrap_or_default();
+            let text = serde_json::to_string_pretty(&pulled)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
             Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
         }
         "add_todo" => {
