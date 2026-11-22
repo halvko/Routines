@@ -173,7 +173,8 @@ fn run(case: &Case) -> Result<(), String> {
 /// Undoing must restore what the user sees: the same live routines, runs,
 /// steps, marks, placements and backlog. What it cannot restore exactly
 /// does not show: the order marks were made in, the time a run or to-do
-/// that finishes again finished, the options remembered for the next start.
+/// that finishes again finished, the options remembered for the next start,
+/// the order of a step's dependencies.
 fn check_undo(before: &Db, after: &Db, stamp: &Stamp, undo: &Change) -> Result<(), String> {
     let mut undone = after.clone();
     let s = Stamp {
@@ -208,8 +209,11 @@ fn strip_removed(v: &mut Value) {
                     if let Some(Value::Object(done)) = o.get_mut("done") {
                         done.sort_keys();
                     }
-                    // A step's dependencies are a set; Undo restores them by
-                    // set, not by position.
+                    // Undo gives a step back the same dependencies, but
+                    // not always in the same order (removing a restored
+                    // step appends what it hands down, as the app does).
+                    // Only this Undo check ignores order: a case's
+                    // `expected` still pins it.
                     if let Some(Value::Array(steps)) = o.get_mut("steps") {
                         for st in steps {
                             if let Some(Value::Array(after)) = st.get_mut("after") {
