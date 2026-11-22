@@ -9,7 +9,8 @@ are first class**.
 **Keep Cloudflare Workers in Rust (0005).** Everything sync and MCP need ran
 on the real Workers runtime (`workerd`, locally) in about 600 lines of Rust,
 built and tested in roughly an hour and a half. Two problems showed up at
-runtime, both small and fixed or worked around (below), far inside the
+runtime, both small: one is patched, the other is a rule for the real
+server (below), far inside the
 "weekend" budget 0005 set.
 
 **Fallback: AWS Lambda + DynamoDB + API Gateway WebSockets**, as the owner

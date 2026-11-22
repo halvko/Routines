@@ -183,7 +183,11 @@ async fn call_tool(
             headers.set("Content-Type", "application/json").map_err(internal)?;
             init.with_method(Method::Post)
                 .with_headers(headers)
-                .with_body(Some(serde_json::to_string(&body).unwrap_or_default().into()));
+                .with_body(Some(
+                    serde_json::to_string(&body)
+                        .map_err(|e| ErrorData::internal_error(e.to_string(), None))?
+                        .into(),
+                ));
             let req = Request::new_with_init("https://user/push", &init).map_err(internal)?;
             let pushed: PushResponse = crate::user_stub(env, user)
                 .map_err(internal)?

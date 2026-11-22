@@ -62,7 +62,7 @@ pub struct PullResponse {
 /// Default page size for pull, for devices and MCP alike.
 pub const PULL_LIMIT: i64 = 500;
 
-/// The object's URL for a pull, used by the router's callers inside the Worker.
+/// URL of the object's `/pull` route, for calls from inside the Worker.
 pub fn pull_url(after: i64, limit: i64) -> String {
     format!("https://user/pull?after={after}&limit={limit}")
 }
