@@ -12,7 +12,7 @@
 //!   outbox on each device, one ordered log per user on the server.
 //!   [`Client::update`] is the core's one entry point on a device: an
 //!   [`Event`] in, [`Effect`]s out, never waiting and doing no I/O.
-//!   (Decisions 0002 and 0003 in `docs/decisions/`, arriving with PR #2.)
+//!   (Decisions 0002 and 0003 in `docs/decisions/`.)
 //! - [`today`], [`open_backlog`], [`deleted`]: what the screens and MCP read.
 //! - [`tools`]: the MCP tools, generated from [`Change`].
 
@@ -38,6 +38,6 @@ pub use runs::{
 };
 pub use seed::seed;
 pub use sync::{Client, Effect, Envelope, Event, Log, LogEntry, Saved};
-pub use tools::{Annotations, READ_TOOLS, Tool, change_from_tool, tools};
+pub use tools::{Annotations, READ_TOOLS, Tool, change_from_tool, tool_call, tools};
 pub use types::*;
 pub use view::{DeletedThing, RunningRun, Today, TodayStep, deleted, open_backlog, today};

@@ -10,7 +10,7 @@ Living document of where Routines is heading. Decisions marked ✅ are built.
 - **Flags are the templating.** Steps (and dependencies) can be "only if `gym`" / `!gym`; flags are chosen when starting a run. Hidden steps are bridged so dependencies still flow. ✅
 - **Runs are snapshots.** Editing a routine never rewrites a run already started. ✅
 - **Every device is equal, and Claude is one more.** Each change is applied on the device at once, works offline, and syncs through the server; Claude's changes through MCP go the same way. (Rust core; the server and app come next.)
-- **Nothing is lost by syncing.** Deleting or abandoning never erases: it can always be restored, and a list of deleted things makes that possible later. A change made offline that no longer fits (say, ticking a step of a run abandoned on another device) is never dropped quietly: it shows as a quiet notice to look at when convenient.
+- **Nothing is lost by syncing.** Deleting a routine or to-do, or abandoning a run, never erases it: the `deleted` list shows it and it can be restored. A removed step comes back with its Undo. A change made offline that no longer fits (say, ticking a step of a run abandoned on another device) is never dropped quietly: it shows as a quiet notice to look at when convenient.
 - **Routines all the way down.** The day itself is a routine; everything else attaches to it.
 
 ## Build order

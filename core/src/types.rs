@@ -50,7 +50,7 @@ pub struct Routine {
     pub extra: Extra,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum StepType {
     Task,
@@ -59,7 +59,7 @@ pub enum StepType {
 }
 
 /// One step of a routine.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Step {
     pub id: String,
     #[serde(rename = "type")]
@@ -81,7 +81,7 @@ pub struct Step {
 }
 
 /// "Comes after step `id`", optionally only when a condition holds.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Edge {
     pub id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

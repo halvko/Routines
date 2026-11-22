@@ -4,7 +4,8 @@
 //! fields), plus read-only tools for what the app shows.
 //!
 //! A tool call becomes a change with [`change_from_tool`], and goes through
-//! the user's [`crate::Log`] like a push from any device.
+//! the user's [`crate::Log`] like a push from any device. Its Undo goes back
+//! to Claude as a tool call ([`tool_call`]).
 
 use crate::change::Change;
 use serde::{Deserialize, Serialize};
@@ -117,6 +118,19 @@ pub fn change_from_tool(name: &str, args: Value) -> Result<Change, serde_json::E
     };
     obj.insert("op".into(), Value::String(camel(name)));
     serde_json::from_value(Value::Object(obj))
+}
+
+/// A change as a tool call: the tool's name and its arguments. The server
+/// answers each change tool with its Undo in this form, so Claude can undo
+/// with one more call (`remove_step` hands back a `restore_step` call).
+pub fn tool_call(change: &Change) -> (String, Value) {
+    let mut args = serde_json::to_value(change).expect("a change is JSON");
+    let op = args
+        .as_object_mut()
+        .and_then(|o| o.remove("op"))
+        .and_then(|op| op.as_str().map(snake))
+        .expect("every change has an op");
+    (op, args)
 }
 
 fn snake(camel: &str) -> String {

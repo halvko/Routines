@@ -44,8 +44,8 @@ fn every_change_is_a_tool_with_a_description() {
     );
     assert!(start.input_schema["properties"].get("name").is_none());
     assert!(
-        !names.contains("restore_step"),
-        "an Undo payload, not a tool"
+        names.contains("restore_step"),
+        "a step removed through MCP can be put back"
     );
     assert_eq!(start.input_schema["required"], json!(["routine"]));
     let destructive: HashSet<_> = tools
@@ -105,9 +105,6 @@ fn snake(camel: &str) -> String {
     })
 }
 
-/// Changes the core makes itself (Undo payloads), not offered as tools.
-const NOT_TOOLS: &[&str] = &["restoreStep"];
-
 #[test]
 fn every_tool_is_used_in_the_scenarios_and_its_arguments_become_its_change() {
     let tools = tools();
@@ -119,9 +116,6 @@ fn every_tool_is_used_in_the_scenarios_and_its_arguments_become_its_change() {
     let mut used = HashSet::new();
     for c in scenario_changes() {
         let op = c["op"].as_str().unwrap().to_string();
-        if NOT_TOOLS.contains(&op.as_str()) {
-            continue;
-        }
         let name = snake(&op);
         assert!(
             change_tools.contains(&name),
@@ -132,6 +126,11 @@ fn every_tool_is_used_in_the_scenarios_and_its_arguments_become_its_change() {
         let from_tool = change_from_tool(&name, args).unwrap();
         let direct: Change = serde_json::from_value(c.clone()).unwrap();
         assert_eq!(from_tool, direct, "{name}");
+        assert_eq!(tool_call(&direct).0, name);
+        assert_eq!(
+            change_from_tool(&name, tool_call(&direct).1).unwrap(),
+            direct
+        );
         used.insert(name);
     }
     let unused: Vec<_> = change_tools.difference(&used).collect();
@@ -158,6 +157,30 @@ fn tool_arguments_become_changes() {
     );
     assert!(change_from_tool("today", Value::Null).is_err());
     assert!(change_from_tool("mark_step", json!({"run": "a"})).is_err());
+}
+
+#[test]
+fn a_step_removed_through_mcp_comes_back_through_its_undo() {
+    let mut db = seed();
+    let stamp = |seq| Stamp {
+        client: "mcp".into(),
+        seq,
+        at: 1,
+    };
+    let removed = apply(
+        &mut db,
+        &stamp(1),
+        &change_from_tool(
+            "remove_step",
+            json!({"routine": "breakfast", "step": "eat"}),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let (name, args) = tool_call(&removed.undo.unwrap());
+    assert_eq!(name, "restore_step");
+    apply(&mut db, &stamp(2), &change_from_tool(&name, args).unwrap()).unwrap();
+    assert_eq!(db.routines, seed().routines);
 }
 
 #[test]

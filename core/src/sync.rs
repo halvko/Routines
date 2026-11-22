@@ -1,5 +1,5 @@
 //! Sync between devices, as plain state machines with no I/O (decision
-//! 0003, `docs/decisions/0003-sync.md`, arriving with PR #2).
+//! 0003, `docs/decisions/0003-sync.md`).
 //!
 //! - A device keeps a [`Client`]: the state as of the last change it pulled
 //!   from the server (the *base*), plus an *outbox* of its own changes the
@@ -221,7 +221,7 @@ impl Client {
 
     /// Handle one event. Never waits and never does I/O; the shell carries
     /// out the effects and reports results as new events, so `update` never
-    /// runs inside itself (decision 0002, arriving with PR #2).
+    /// runs inside itself (decision 0002).
     pub fn update(&mut self, event: Event) -> Vec<Effect> {
         match event {
             Event::Change { at, change } => self.change(at, change),

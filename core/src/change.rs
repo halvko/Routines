@@ -3,8 +3,8 @@
 //! A [`Change`] says what the user (or Claude, through MCP) wants, never how
 //! the data should look afterwards. Sync replays it: on the device that made
 //! it, again on the server after other devices' changes, and on every device
-//! after a pull (decision 0003, `docs/decisions/0003-sync.md`, arriving with
-//! PR #2). That shapes the list:
+//! after a pull (decision 0003, `docs/decisions/0003-sync.md`). That shapes
+//! the list:
 //!
 //! - **Absolute, not toggles.** "Mark this step done" and "star this to-do",
 //!   never "toggle": the same change applied twice, or by two devices, gives
@@ -89,7 +89,7 @@ impl Placement {
 
 /// A step whose dependencies removing another step changed, and what they
 /// were before.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Rewired {
     pub step: String,
     pub after: Vec<Edge>,
@@ -181,10 +181,9 @@ pub enum Change {
     /// waited on. Its Undo puts it back as it was.
     #[schemars(extend("x-destructive" = true))]
     RemoveStep { routine: String, step: String },
-    /// The Undo of `removeStep`: put a removed step back where it was, and
-    /// give the steps that were rewired their old dependencies back. Made by
-    /// the core, not offered as a tool.
-    #[schemars(skip)]
+    /// Put back a step that `remove_step` removed: pass back exactly the Undo
+    /// that `remove_step` returned. The steps that were rewired wait on it
+    /// again; refused if that would make a loop.
     RestoreStep {
         routine: String,
         step: Box<Step>,
@@ -570,20 +569,13 @@ impl Apply<'_> {
                 if r.removed.is_none() {
                     return Ok(a);
                 }
-                // What it includes must be there, and must not include it.
+                // What it includes must be there. It cannot include itself:
+                // `check_include` follows deleted routines too.
                 let subs: Vec<String> = sub_routines(r).map(str::to_string).collect();
                 for inc in &subs {
                     self.routine(inc)?;
                 }
                 self.db.routines[routine.as_str()].removed = None;
-                if subs
-                    .iter()
-                    .any(|inc| includes(&self.db.routines, inc, routine))
-                {
-                    return Err(Rejected::IncludesItself {
-                        name: self.db.routines[routine.as_str()].name.clone(),
-                    });
-                }
                 Ok(a)
             }
             C::AddTask {
@@ -673,11 +665,15 @@ impl Apply<'_> {
                         step: r.steps[i].id.clone(),
                         after: r.steps[i].after.clone(),
                     });
+                    // In its place, so an Undo can put it back in order.
+                    let at = r.steps[i].after.iter().position(|e| &e.id == step);
                     r.steps[i].after.retain(|e| &e.id != step);
+                    let mut at = at.unwrap_or(0);
                     for e in &gone_after {
                         let o = &r.steps[i];
                         if !o.after.iter().any(|x| x.id == e.id) && !would_cycle(r, &o.id, &e.id) {
-                            r.steps[i].after.push(e.clone());
+                            r.steps[i].after.insert(at, e.clone());
+                            at += 1;
                         }
                     }
                 }
@@ -695,22 +691,55 @@ impl Apply<'_> {
                 before,
                 rewired,
             } => {
-                let r = self.routine_mut(routine)?;
+                let r = self.routine(routine)?;
                 if r.steps.iter().any(|s| s.id == step.id) {
                     return Err(Rejected::Exists {
                         kind: Kind::Step,
                         id: step.id.clone(),
                     });
                 }
+                // What it includes must still be there and must not loop.
+                if let Some(inc) = &step.routine_id {
+                    self.check_include(routine, inc)?;
+                }
+                let r = &mut self.db.routines[routine.as_str()];
+                let mut back = (**step).clone();
+                // Edges to steps removed since then are dropped.
+                back.after.retain(|e| r.steps.iter().any(|s| s.id == e.id));
                 let at = before
                     .as_ref()
                     .and_then(|b| r.steps.iter().position(|s| &s.id == b))
                     .unwrap_or(r.steps.len());
-                r.steps.insert(at, (**step).clone());
+                r.steps.insert(at, back);
+                // Take back the edges the removal handed down, and wait on
+                // the restored step again; keep edits made since.
                 for w in rewired {
-                    if let Some(s) = r.steps.iter_mut().rev().find(|s| s.id == w.step) {
-                        s.after = w.after.clone();
-                    }
+                    let Some(s) = r.steps.iter_mut().rev().find(|s| s.id == w.step) else {
+                        continue;
+                    };
+                    // In the old order, with any edits made since.
+                    let mut after: Vec<Edge> = w
+                        .after
+                        .iter()
+                        .filter_map(|o| match s.after.iter().find(|e| e.id == o.id) {
+                            Some(now) => Some(now.clone()),
+                            None if o.id == step.id => Some(o.clone()),
+                            None => None,
+                        })
+                        .collect();
+                    after.extend(
+                        s.after
+                            .iter()
+                            .filter(|e| {
+                                !w.after.iter().any(|o| o.id == e.id)
+                                    && !step.after.iter().any(|g| g.id == e.id)
+                            })
+                            .cloned(),
+                    );
+                    s.after = after;
+                }
+                if has_step_loop(r) {
+                    return Err(Rejected::StepLoop);
                 }
                 Ok(a.undo(C::RemoveStep {
                     routine: routine.clone(),
@@ -1346,4 +1375,11 @@ fn removed(kind: Kind, id: &str) -> Rejected {
         kind,
         id: id.to_string(),
     }
+}
+
+/// Does any step of the routine (transitively) wait on itself?
+fn has_step_loop(r: &Routine) -> bool {
+    r.steps
+        .iter()
+        .any(|s| s.after.iter().any(|e| would_cycle(r, &s.id, &e.id)))
 }
