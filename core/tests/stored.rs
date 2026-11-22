@@ -88,3 +88,29 @@ fn fields_this_version_does_not_know_are_kept() {
     let db: Db = serde_json::from_value(raw.clone()).unwrap();
     assert_eq!(serde_json::to_value(&db).unwrap(), raw);
 }
+
+#[test]
+fn removal_marks_load_and_save_back_unchanged() {
+    // The app's data has no `removed` (the stored fixture shows it loads);
+    // data the core wrote does, on routines, runs and to-dos.
+    let mut raw = stored();
+    let mark = json!({"at": 1700000000000_i64, "by": "phone-1"});
+    let first_run = raw["runs"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .next()
+        .unwrap()
+        .clone();
+    raw["routines"]["travel"]["removed"] = mark.clone();
+    raw["runs"][&first_run]["removed"] = mark.clone();
+    raw["backlog"][0]["removed"] = mark.clone();
+    let db: Db = serde_json::from_value(raw.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&db).unwrap(), raw);
+    let r = db.routines["travel"].removed.as_ref().unwrap();
+    assert_eq!((r.at, r.by.as_str()), (1700000000000, "phone-1"));
+    assert!(db.runs[&first_run].removed.is_some());
+    assert!(db.backlog[0].removed.is_some());
+    assert!(!live_routines(&db).contains_key("travel"));
+    assert!(!live_runs(&db).contains_key(&first_run));
+}

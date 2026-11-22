@@ -19,6 +19,14 @@ Judge the tests the diff adds or changes, and the tests it should have.
   so read every changed `expected` as a change in behaviour: is it the one
   the PR describes? A vector case that cannot fail (a rule the input never
   reaches, an empty result that every bug would also give) checks nothing.
+- Changes (`core/src/change.rs`) are pinned by scenarios in
+  `core/tests/changes/*.json`: a start state, changes with what each must
+  do (applied, with its Undo, or refused with a reason), and the data and
+  Today afterwards. The runner also checks that every Undo really undoes and
+  that a refusal changes nothing. A new or changed change comes with a
+  scenario, including the refusals it can give. Sync (`core/tests/sync.rs`)
+  is tested with simulated devices and a server: a change to `Client` or
+  `Log` comes with a case there (offline edits, retries, gaps, refusals).
 - `core/tests/stored.rs` loads data captured from the app
   (`core/tests/fixtures/stored.json`). A change to what is stored updates
   that fixture and checks that older data still loads.

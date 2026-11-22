@@ -38,6 +38,15 @@ is the worst bug it can have.
   field the app writes, optional where older data may lack it, and unknown
   fields kept in `extra` so saving through the core drops nothing. A field
   made required, renamed or retyped can make existing data fail to load.
+- Changes (`core/src/change.rs`) are replayed: on the device, again on the
+  server after other devices' changes, and on every device after a pull.
+  So `apply` must be deterministic (no clock, no randomness: time and new
+  ids come from the `Stamp`), refuse a change whole (never half applied),
+  and state intent absolutely (set, not toggle), so applying it twice or
+  late still gives what the user meant. Removing sets `removed`, never
+  erases; anything that reads runs or routines must skip removed ones
+  (`live_runs`, `live_routines`). A refused change is kept and shown
+  (`Effect::Refused`, notices), never dropped quietly.
 - Every value interpolated into HTML goes through `esc()`.
 - The service worker (`sw.js`): a new file the app loads must be in `SHELL`,
   and a change to any shell file needs the cache version bumped, or phones
