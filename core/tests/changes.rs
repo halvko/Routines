@@ -209,11 +209,7 @@ fn strip_removed(v: &mut Value) {
                     if let Some(Value::Object(done)) = o.get_mut("done") {
                         done.sort_keys();
                     }
-                    // Undo gives a step back the same dependencies, but
-                    // not always in the same order (removing a restored
-                    // step appends what it hands down, as the app does).
-                    // Only this Undo check ignores order: a case's
-                    // `expected` still pins it.
+                    // Dependency order: see `check_undo`; `expected` pins it.
                     if let Some(Value::Array(steps)) = o.get_mut("steps") {
                         for st in steps {
                             if let Some(Value::Array(after)) = st.get_mut("after") {
