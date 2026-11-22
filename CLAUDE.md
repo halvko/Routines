@@ -31,6 +31,11 @@ When a change adds or changes a screen, add or update its case in
   `core/tests/vectors/*.json`, run `npm run vectors` to write its expected
   result from the JavaScript, and check the diff. Both test suites run the
   vectors.
+- In the Rust core, data changes only through a `Change` and `apply()`
+  (`core/src/change.rs`): sync replays changes on every device and the
+  server, and MCP tools are generated from them. A new change needs a doc
+  comment written for the user (it becomes the MCP tool's description), an
+  Undo where one makes sense, and a scenario in `core/tests/changes/`.
 
 ## Workflow
 

@@ -7,6 +7,7 @@
 //! is placed first, the order of blockers) follow that order.
 
 use indexmap::IndexMap;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -42,6 +43,9 @@ pub struct Routine {
     /// The flags chosen the last time a run of it started, offered next time.
     #[serde(rename = "lastFlags", default, skip_serializing_if = "Option::is_none")]
     pub last_flags: Option<Flags>,
+    /// Set when it is deleted; see [`Removed`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub removed: Option<Removed>,
     #[serde(flatten)]
     pub extra: Extra,
 }
@@ -118,13 +122,16 @@ pub struct Run {
     /// Where the run is placed relative to a step of another run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attach: Option<Attach>,
+    /// Set when it is deleted; see [`Removed`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub removed: Option<Removed>,
     #[serde(flatten)]
     pub extra: Extra,
 }
 
 /// A concrete step of a run. Ids of steps from sub-routines are prefixed with
 /// the including steps' ids: `bf/coffee`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Node {
     pub id: String,
     pub title: String,
@@ -136,7 +143,7 @@ pub struct Node {
     pub extra: Extra,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Mark {
     Done,
@@ -144,7 +151,7 @@ pub enum Mark {
     Skipped,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Rel {
     /// The run's first steps wait on the other run's step.
@@ -153,7 +160,7 @@ pub enum Rel {
     Before,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Attach {
     pub rel: Rel,
     /// The other run.
@@ -165,7 +172,7 @@ pub struct Attach {
 }
 
 /// A step in some run.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct NodeRef {
     pub run: String,
     pub id: String,
@@ -185,6 +192,9 @@ pub struct BacklogItem {
     /// The to-do run it was pulled into, while it is in Today.
     #[serde(rename = "runId", default, skip_serializing_if = "Option::is_none")]
     pub run_id: Option<String>,
+    /// Set when it is deleted; see [`Removed`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub removed: Option<Removed>,
     #[serde(flatten)]
     pub extra: Extra,
 }
@@ -196,4 +206,16 @@ pub struct Prefs {
     pub today_mode: Option<String>,
     #[serde(flatten)]
     pub extra: Extra,
+}
+
+/// Deleting a routine or a to-do, or abandoning a run, never erases it: it
+/// gets this mark, which syncs like any other field, and can be taken off
+/// again (decision 0003). Everything that reads runs and routines skips
+/// removed ones.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Removed {
+    /// Milliseconds since the epoch.
+    pub at: i64,
+    /// The device that removed it.
+    pub by: String,
 }

@@ -1,0 +1,244 @@
+{
+  "routines": {
+    "breakfast": {
+      "id": "breakfast",
+      "name": "Breakfast",
+      "steps": [
+        {
+          "id": "coffee",
+          "type": "task",
+          "title": "Start the coffee",
+          "when": "",
+          "after": []
+        },
+        {
+          "id": "food",
+          "type": "task",
+          "title": "Make food",
+          "when": "",
+          "after": []
+        },
+        {
+          "id": "eat",
+          "type": "task",
+          "title": "Eat",
+          "when": "",
+          "after": [
+            {
+              "id": "coffee"
+            },
+            {
+              "id": "food"
+            }
+          ]
+        },
+        {
+          "id": "clean",
+          "type": "task",
+          "title": "Clean up",
+          "when": "",
+          "after": [
+            {
+              "id": "eat"
+            }
+          ]
+        }
+      ]
+    },
+    "morning": {
+      "id": "morning",
+      "name": "Morning",
+      "steps": [
+        {
+          "id": "wake",
+          "type": "task",
+          "title": "Get out of bed",
+          "when": "",
+          "after": []
+        },
+        {
+          "id": "water",
+          "type": "task",
+          "title": "Drink a glass of water",
+          "when": "",
+          "after": [
+            {
+              "id": "wake"
+            }
+          ]
+        },
+        {
+          "id": "gym",
+          "type": "task",
+          "title": "Gym session",
+          "when": "gym",
+          "after": [
+            {
+              "id": "water"
+            }
+          ]
+        },
+        {
+          "id": "shower",
+          "type": "task",
+          "title": "Shower",
+          "when": "",
+          "after": [
+            {
+              "id": "wake"
+            },
+            {
+              "id": "gym"
+            }
+          ]
+        },
+        {
+          "id": "teeth",
+          "type": "task",
+          "title": "Brush teeth",
+          "when": "",
+          "after": [
+            {
+              "id": "shower"
+            }
+          ]
+        },
+        {
+          "id": "dress",
+          "type": "task",
+          "title": "Get dressed",
+          "when": "",
+          "after": [
+            {
+              "id": "teeth"
+            }
+          ]
+        },
+        {
+          "id": "bf",
+          "type": "routine",
+          "routineId": "breakfast",
+          "when": "",
+          "after": [
+            {
+              "id": "dress"
+            }
+          ]
+        },
+        {
+          "id": "meds",
+          "type": "task",
+          "title": "Take vitamins",
+          "when": "",
+          "after": [
+            {
+              "id": "bf"
+            }
+          ]
+        }
+      ]
+    },
+    "travel": {
+      "id": "travel",
+      "name": "Travel",
+      "steps": [
+        {
+          "id": "checkin",
+          "type": "task",
+          "title": "Check in online",
+          "when": "flying",
+          "after": []
+        },
+        {
+          "id": "passport",
+          "type": "task",
+          "title": "Passport",
+          "when": "abroad",
+          "after": []
+        },
+        {
+          "id": "adapter",
+          "type": "task",
+          "title": "Power adapter",
+          "when": "abroad",
+          "after": []
+        },
+        {
+          "id": "clothes",
+          "type": "task",
+          "title": "Clothes",
+          "when": "",
+          "after": []
+        },
+        {
+          "id": "toiletries",
+          "type": "task",
+          "title": "Toiletries",
+          "when": "",
+          "after": [
+            {
+              "id": "clothes"
+            }
+          ]
+        },
+        {
+          "id": "charger",
+          "type": "task",
+          "title": "Phone charger",
+          "when": "",
+          "after": []
+        },
+        {
+          "id": "close",
+          "type": "task",
+          "title": "Pack the bag",
+          "when": "",
+          "after": [
+            {
+              "id": "passport"
+            },
+            {
+              "id": "adapter"
+            },
+            {
+              "id": "toiletries"
+            },
+            {
+              "id": "charger"
+            },
+            {
+              "id": "checkin"
+            }
+          ]
+        },
+        {
+          "id": "lights",
+          "type": "task",
+          "title": "Lights off, windows shut",
+          "when": "",
+          "after": [
+            {
+              "id": "close"
+            }
+          ]
+        },
+        {
+          "id": "lock",
+          "type": "task",
+          "title": "Lock the door",
+          "when": "",
+          "after": [
+            {
+              "id": "lights"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "runs": {},
+  "backlog": [],
+  "prefs": {
+    "todayMode": "mixed"
+  }
+}

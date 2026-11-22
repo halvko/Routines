@@ -1,0 +1,109 @@
+{
+  "about": "Editing routines: creating, renaming, steps and what they come after, sub-routines, deleting and restoring.",
+  "cases": [
+    {
+      "name": "a new routine without a name is called Untitled",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "createRoutine", "name": "  "}, "ok": {"created": "dev-1", "undo": {"op": "deleteRoutine", "routine": "dev-1"}}},
+        {"change": {"op": "renameRoutine", "routine": "dev-1", "name": " Evening "}, "ok": {"undo": {"name": "Untitled"}}},
+        {"change": {"op": "createRoutine", "routine": "dev-1", "name": "Again"}, "rejected": {"reason": "exists", "kind": "routine"}}
+      ],
+      "expected": {"routines": {"dev-1": {"id": "dev-1", "name": "Evening", "steps": []}}}
+    },
+    {
+      "name": "adding steps, what they come after and their conditions",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "createRoutine", "routine": "e", "name": "Evening"}},
+        {"change": {"op": "addTask", "routine": "e", "step": "dishes", "title": "Dishes"}},
+        {"change": {"op": "addTask", "routine": "e", "step": "read", "title": "Read", "after": ["dishes"], "when": "!tired"}, "ok": {"created": "read", "undo": {"op": "removeStep", "step": "read"}}},
+        {"change": {"op": "addTask", "routine": "e", "title": "Sleep", "after": ["nope"]}, "rejected": {"reason": "notFound", "kind": "step", "id": "nope"}},
+        {"change": {"op": "addTask", "routine": "e", "step": "read", "title": "Again"}, "rejected": {"reason": "exists", "kind": "step"}},
+        {"change": {"op": "setStepWhen", "routine": "e", "step": "dishes", "when": "home"}, "ok": {"undo": {"when": ""}}},
+        {"change": {"op": "setStepWhen", "routine": "e", "step": "dishes", "when": ""}}
+      ],
+      "expected": {"routines": {"e": {"steps": [
+        {"id": "dishes", "type": "task", "title": "Dishes", "when": null, "after": []},
+        {"id": "read", "type": "task", "title": "Read", "when": "!tired", "after": [{"id": "dishes"}]}
+      ]}}}
+    },
+    {
+      "name": "a dependency that would make a loop is refused; one that exists already changes nothing",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "addDep", "routine": "breakfast", "step": "coffee", "on": "clean"}, "rejected": {"reason": "stepLoop"}},
+        {"change": {"op": "addDep", "routine": "breakfast", "step": "coffee", "on": "coffee"}, "rejected": {"reason": "stepLoop"}},
+        {"change": {"op": "addDep", "routine": "breakfast", "step": "eat", "on": "coffee"}, "ok": {"undo": null}},
+        {"change": {"op": "addDep", "routine": "breakfast", "step": "food", "on": "coffee"}, "ok": {"undo": {"op": "removeDep", "step": "food", "on": "coffee"}}},
+        {"change": {"op": "removeDep", "routine": "breakfast", "step": "food", "on": "coffee"}, "ok": {"undo": {"op": "addDep", "step": "food", "on": "coffee"}}},
+        {"change": {"op": "removeDep", "routine": "breakfast", "step": "food", "on": "coffee"}, "ok": {"undo": null}}
+      ],
+      "expected": {"routines": {"breakfast": {"steps": [
+        {"after": []}, {"after": []}, {"after": [{"id": "coffee"}, {"id": "food"}]}, {"after": [{"id": "eat"}]}
+      ]}}}
+    },
+    {
+      "name": "removing a step: what waited on it waits on what it waited on",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "removeStep", "routine": "breakfast", "step": "eat"}}
+      ],
+      "expected": {"routines": {"breakfast": {"steps": [
+        {"id": "coffee"}, {"id": "food"}, {"id": "clean", "after": [{"id": "coffee"}, {"id": "food"}]}
+      ]}}}
+    },
+    {
+      "name": "moving a step in the list, and undoing it",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "moveStep", "routine": "breakfast", "step": "clean", "before": "coffee"}, "ok": {"undo": {"op": "moveStep", "step": "clean", "before": null}}},
+        {"change": {"op": "moveStep", "routine": "breakfast", "step": "coffee"}, "ok": {"undo": {"before": "food"}}}
+      ],
+      "expected": {"routines": {"breakfast": {"steps": [{"id": "clean"}, {"id": "food"}, {"id": "eat"}, {"id": "coffee"}]}}}
+    },
+    {
+      "name": "a routine cannot include a routine that includes it",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "addSubRoutine", "routine": "breakfast", "includes": "morning"}, "rejected": {"reason": "includesItself", "name": "Breakfast"}},
+        {"change": {"op": "addSubRoutine", "routine": "breakfast", "includes": "breakfast"}, "rejected": {"reason": "includesItself"}},
+        {"change": {"op": "addSubRoutine", "routine": "travel", "step": "m", "includes": "morning", "after": ["lock"]}},
+        {"change": {"op": "setStepRoutine", "routine": "travel", "step": "m", "includes": "breakfast"}, "ok": {"undo": {"includes": "morning"}}},
+        {"change": {"op": "setStepRoutine", "routine": "travel", "step": "lock", "includes": "breakfast"}, "rejected": {"reason": "wrongStepType", "step": "lock"}},
+        {"change": {"op": "setStepTitle", "routine": "travel", "step": "m", "title": "x"}, "rejected": {"reason": "wrongStepType"}}
+      ],
+      "expected": {"routines": {"travel": {"steps": [{}, {}, {}, {}, {}, {}, {}, {}, {}, {"id": "m", "type": "routine", "routineId": "breakfast", "after": [{"id": "lock"}]}]}}}
+    },
+    {
+      "name": "a routine another routine includes cannot be deleted",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "deleteRoutine", "routine": "breakfast"}, "rejected": {"reason": "usedBy", "names": ["Morning"]}},
+        {"change": {"op": "removeStep", "routine": "morning", "step": "bf"}},
+        {"change": {"op": "deleteRoutine", "routine": "breakfast"}, "ok": {"undo": {"op": "restoreRoutine", "routine": "breakfast"}}}
+      ],
+      "expected": {"routines": {"breakfast": {"removed": {"at": 3000, "by": "dev"}}, "morning": {"steps": [{}, {}, {}, {}, {}, {}, {"id": "meds", "after": [{"id": "dress"}]}]}}}
+    },
+    {
+      "name": "a deleted routine is not edited or included until it is restored",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "deleteRoutine", "routine": "travel"}},
+        {"change": {"op": "renameRoutine", "routine": "travel", "name": "Trip"}, "rejected": {"reason": "removed", "kind": "routine", "id": "travel"}},
+        {"change": {"op": "addSubRoutine", "routine": "morning", "includes": "travel"}, "rejected": {"reason": "removed"}},
+        {"change": {"op": "restoreRoutine", "routine": "travel"}},
+        {"change": {"op": "renameRoutine", "routine": "travel", "name": "Trip"}}
+      ],
+      "expected": {"routines": {"travel": {"name": "Trip", "removed": null}}}
+    },
+    {
+      "name": "Today's layout is a preference",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "setTodayMode", "mode": "grouped"}, "ok": {"undo": {"op": "setTodayMode", "mode": "mixed"}}}
+      ],
+      "expected": {"prefs": {"todayMode": "grouped"}}
+    }
+  ]
+}

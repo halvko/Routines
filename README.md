@@ -22,6 +22,12 @@ used by the server and, as WebAssembly, by the app). Until the app uses it,
 `src/graph.js` and `core/` implement the same rules and are checked against
 the same test vectors in `core/tests/vectors/`.
 
+On top of the rules, the core defines every change to the data (`Change`,
+applied by `apply`), the device and server sides of sync (`Client`, `Log`),
+what Today and the backlog show (`today`, `open_backlog`), and the MCP tools
+Claude uses (`tools`, generated from `Change`). Their scenarios are data too,
+in `core/tests/changes/`.
+
 Data lives in localStorage (Export/Import under Routines). Changes go through
 pull requests reviewed by Claude reviewers; see `.github/reviewers/README.md`
 and `CLAUDE.md`.

@@ -1,0 +1,126 @@
+{
+  "about": "The backlog: adding, editing, starring, finishing, pulling into Today and back, deleting and restoring to-dos.",
+  "cases": [
+    {
+      "name": "a to-do needs a title, and its title is trimmed",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "addItem", "title": "   "}, "rejected": {"reason": "emptyTitle"}},
+        {"change": {"op": "addItem", "title": "  Buy milk  "}, "ok": {"created": "dev-2", "change": {"item": "dev-2", "title": "Buy milk"}, "undo": {"op": "deleteItem", "item": "dev-2"}}}
+      ],
+      "expected": {"backlog": [{"id": "dev-2", "title": "Buy milk", "starred": false, "createdAt": 2000, "doneAt": null, "runId": null}]}
+    },
+    {
+      "name": "the backlog lists starred to-dos first, then the newest",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "addItem", "item": "a", "title": "A"}},
+        {"change": {"op": "addItem", "item": "b", "title": "B", "starred": true}},
+        {"change": {"op": "addItem", "item": "c", "title": "C"}},
+        {"change": {"op": "addItem", "item": "d", "title": "D"}},
+        {"change": {"op": "completeItem", "item": "d", "done": true}, "ok": {"undo": {"op": "completeItem", "done": false}}}
+      ],
+      "backlog": [{"id": "b"}, {"id": "c"}, {"id": "a"}]
+    },
+    {
+      "name": "starring, renaming and undoing them",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "addItem", "item": "a", "title": "A"}},
+        {"change": {"op": "starItem", "item": "a", "starred": true}, "ok": {"undo": {"op": "starItem", "starred": false}}},
+        {"change": {"op": "renameItem", "item": "a", "title": "  "}, "rejected": {"reason": "emptyTitle"}},
+        {"change": {"op": "renameItem", "item": "a", "title": "Call mum"}, "ok": {"undo": {"op": "renameItem", "title": "A"}}}
+      ],
+      "expected": {"backlog": [{"id": "a", "title": "Call mum", "starred": true}]}
+    },
+    {
+      "name": "pulling a to-do into Today makes a one-step run for it",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "addItem", "item": "a", "title": "Call the dentist"}},
+        {"change": {"op": "pullItem", "item": "a", "run": "t"}, "ok": {"created": "t", "undo": {"op": "unpullItem", "item": "a"}}},
+        {"change": {"op": "pullItem", "item": "a"}, "rejected": {"reason": "alreadyInToday"}}
+      ],
+      "expected": {
+        "backlog": [{"id": "a", "runId": "t"}],
+        "runs": {"t": {"kind": "todo", "backlogId": "a", "name": "Call the dentist", "startedAt": 2000,
+          "nodes": [{"id": "task", "title": "Call the dentist", "deps": [], "source": "Call the dentist"}]}}
+      },
+      "today": {
+        "doNow": [{"run": "t", "step": "task", "title": "Call the dentist", "from": null}],
+        "running": [{"run": "t", "todo": true, "done": 0, "total": 1}]
+      }
+    },
+    {
+      "name": "ticking a to-do in Today finishes it in the backlog too, and unticking reopens it",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "addItem", "item": "a", "title": "A"}},
+        {"change": {"op": "pullItem", "item": "a", "run": "t"}},
+        {"change": {"op": "markStep", "run": "t", "step": "task", "mark": "done"}, "ok": {"finished": ["t"]}}
+      ],
+      "expected": {"backlog": [{"id": "a", "doneAt": 3000}], "runs": {"t": {"finishedAt": 3000}}},
+      "backlog": []
+    },
+    {
+      "name": "unticking a to-do in Today reopens it in the backlog",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "addItem", "item": "a", "title": "A"}},
+        {"change": {"op": "pullItem", "item": "a", "run": "t"}},
+        {"change": {"op": "markStep", "run": "t", "step": "task", "mark": "done"}},
+        {"change": {"op": "markStep", "run": "t", "step": "task", "mark": null}}
+      ],
+      "expected": {"backlog": [{"id": "a", "doneAt": null}], "runs": {"t": {"finishedAt": null}}},
+      "backlog": [{"id": "a"}]
+    },
+    {
+      "name": "finishing a to-do from the backlog finishes its run in Today, and undoing reopens both",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "addItem", "item": "a", "title": "A"}},
+        {"change": {"op": "pullItem", "item": "a", "run": "t"}},
+        {"change": {"op": "completeItem", "item": "a", "done": true}, "ok": {"finished": ["t"], "undo": {"op": "completeItem", "item": "a", "done": false}}}
+      ],
+      "expected": {"backlog": [{"id": "a", "doneAt": 3000}], "runs": {"t": {"finishedAt": 3000, "done": {"task": "done"}}}},
+      "today": {"running": []}
+    },
+    {
+      "name": "taking a to-do out of Today keeps the to-do and drops its run",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "addItem", "item": "a", "title": "A"}},
+        {"change": {"op": "pullItem", "item": "a", "run": "t"}},
+        {"change": {"op": "unpullItem", "item": "a"}, "ok": {"undo": {"op": "restoreRun", "run": "t"}}},
+        {"change": {"op": "unpullItem", "item": "a"}, "rejected": {"reason": "notInToday"}}
+      ],
+      "expected": {"backlog": [{"id": "a", "runId": null, "removed": null}], "runs": {"t": {"removed": {"at": 3000}}}},
+      "today": {"running": []},
+      "backlog": [{"id": "a"}]
+    },
+    {
+      "name": "deleting a to-do that is in Today takes it out of Today; restoring brings both back",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "addItem", "item": "a", "title": "A"}},
+        {"change": {"op": "pullItem", "item": "a", "run": "t"}},
+        {"change": {"op": "deleteItem", "item": "a"}, "ok": {"undo": {"op": "restoreItem", "item": "a"}}},
+        {"change": {"op": "starItem", "item": "a", "starred": true}, "rejected": {"reason": "removed", "kind": "item"}},
+        {"change": {"op": "restoreItem", "item": "a"}}
+      ],
+      "expected": {"backlog": [{"id": "a", "runId": "t", "removed": null}], "runs": {"t": {"removed": null}}},
+      "today": {"running": [{"run": "t"}]}
+    },
+    {
+      "name": "deleting a to-do's run from Today deletes the to-do; restoring the run brings it back",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "addItem", "item": "a", "title": "A"}},
+        {"change": {"op": "pullItem", "item": "a", "run": "t"}},
+        {"change": {"op": "abandonRun", "run": "t"}}
+      ],
+      "expected": {"backlog": [{"id": "a", "removed": {"at": 3000, "by": "dev"}}], "runs": {"t": {"removed": {"at": 3000}}}},
+      "backlog": []
+    }
+  ]
+}

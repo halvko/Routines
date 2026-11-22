@@ -1,0 +1,273 @@
+{
+  "about": "Starting runs, marking steps, finishing, placing, abandoning and restoring runs.",
+  "cases": [
+    {
+      "name": "starting Morning with gym makes a snapshot run and remembers the options",
+      "start": "seed",
+      "steps": [
+        {
+          "change": {"op": "startRun", "run": "m", "routine": "morning", "flags": {"gym": true}},
+          "ok": {"created": "m", "undo": {"op": "abandonRun", "run": "m"}, "change": {"run": "m"}}
+        }
+      ],
+      "expected": {
+        "routines": {"morning": {"lastFlags": {"gym": true}}},
+        "runs": {"m": {"id": "m", "routineId": "morning", "name": "Morning", "flags": {"gym": true}, "startedAt": 1000, "finishedAt": null, "done": {}}}
+      },
+      "today": {
+        "doNow": [{"run": "m", "runName": "Morning", "step": "wake", "title": "Get out of bed"}],
+        "running": [{"run": "m", "name": "Morning", "todo": false, "flags": ["gym"], "done": 0, "total": 11}]
+      }
+    },
+    {
+      "name": "the started change carries the run's steps, so other devices keep the same snapshot",
+      "start": "seed",
+      "steps": [
+        {
+          "change": {"op": "startRun", "run": "b", "routine": "breakfast"},
+          "ok": {"change": {"op": "startRun", "run": "b", "routine": "breakfast", "nodes": [
+            {"id": "coffee", "deps": []},
+            {"id": "food", "deps": []},
+            {"id": "eat", "deps": ["coffee", "food"]},
+            {"id": "clean", "deps": ["eat"]}
+          ]}}
+        }
+      ]
+    },
+    {
+      "name": "a run made up without an id gets one from the device and its counter",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "routine": "breakfast"}, "ok": {"created": "dev-1"}}
+      ],
+      "expected": {"runs": {"dev-1": {"id": "dev-1"}}}
+    },
+    {
+      "name": "without gym the gym step is left out and the shower waits on what it waited on",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "m", "routine": "morning", "flags": {"gym": false}}}
+      ],
+      "today": {
+        "comingUp": [
+          {"step": "water", "after": ["wake"]},
+          {"step": "shower", "after": ["wake", "water"]},
+          {"step": "teeth", "after": ["shower"]},
+          {"step": "dress", "after": ["teeth"]},
+          {"step": "bf/coffee", "title": "Start the coffee", "from": "Breakfast", "after": ["dress"]},
+          {"step": "bf/food", "after": ["dress"]},
+          {"step": "bf/eat", "after": ["bf/coffee", "bf/food"]},
+          {"step": "bf/clean", "after": ["bf/eat"]},
+          {"step": "meds", "after": ["bf/clean"]}
+        ]
+      }
+    },
+    {
+      "name": "a routine with no steps cannot start",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "createRoutine", "routine": "empty", "name": "Empty"}},
+        {"change": {"op": "startRun", "routine": "empty"}, "rejected": {"reason": "noSteps", "name": "Empty", "hasSteps": false}}
+      ]
+    },
+    {
+      "name": "a routine whose steps are all hidden by the options cannot start",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "createRoutine", "routine": "g", "name": "Gym day"}},
+        {"change": {"op": "addTask", "routine": "g", "step": "lift", "title": "Lift", "when": "gym"}},
+        {"change": {"op": "startRun", "routine": "g", "flags": {"gym": false}}, "rejected": {"reason": "noSteps", "hasSteps": true}}
+      ]
+    },
+    {
+      "name": "a routine that includes itself cannot start",
+      "start": {
+        "routines": {
+          "a": {"id": "a", "name": "A", "steps": [{"id": "s", "type": "routine", "routineId": "b", "after": []}]},
+          "b": {"id": "b", "name": "B", "steps": [{"id": "t", "type": "routine", "routineId": "a", "after": []}]}
+        },
+        "runs": {}
+      },
+      "steps": [
+        {"change": {"op": "startRun", "routine": "a"}, "rejected": {"reason": "cannotStart", "message": "\"A\" includes itself"}}
+      ]
+    },
+    {
+      "name": "a run id cannot be used twice",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "x", "routine": "breakfast"}},
+        {"change": {"op": "startRun", "run": "x", "routine": "travel"}, "rejected": {"reason": "exists", "kind": "run", "id": "x"}}
+      ]
+    },
+    {
+      "name": "a run finishes when its last step is resolved, skipped counting as resolved",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "b", "routine": "breakfast"}},
+        {"change": {"op": "markStep", "run": "b", "step": "coffee", "mark": "done"}, "ok": {"undo": {"op": "markStep", "mark": null}, "finished": null}},
+        {"change": {"op": "markStep", "run": "b", "step": "food", "mark": "skipped"}},
+        {"change": {"op": "markStep", "run": "b", "step": "eat", "mark": "done"}},
+        {"change": {"op": "markStep", "run": "b", "step": "clean", "mark": "done"}, "ok": {"finished": ["b"]}}
+      ],
+      "expected": {"runs": {"b": {"finishedAt": 5000, "done": {"coffee": "done", "food": "skipped", "eat": "done", "clean": "done"}}}},
+      "today": {"doNow": [], "comingUp": [], "running": []}
+    },
+    {
+      "name": "clearing a mark reopens a finished run",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "b", "routine": "breakfast"}},
+        {"change": {"op": "markStep", "run": "b", "step": "coffee", "mark": "done"}},
+        {"change": {"op": "markStep", "run": "b", "step": "food", "mark": "done"}},
+        {"change": {"op": "markStep", "run": "b", "step": "eat", "mark": "done"}},
+        {"change": {"op": "markStep", "run": "b", "step": "clean", "mark": "done"}},
+        {"change": {"op": "markStep", "run": "b", "step": "eat", "mark": null}, "ok": {"undo": {"mark": "done"}}}
+      ],
+      "expected": {"runs": {"b": {"finishedAt": null, "done": {"coffee": "done", "food": "done", "clean": "done"}}}},
+      "today": {"doNow": [{"step": "eat"}], "running": [{"run": "b", "done": 3, "total": 4}]}
+    },
+    {
+      "name": "marking the same step twice is the same as once",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "b", "routine": "breakfast"}},
+        {"change": {"op": "markStep", "run": "b", "step": "coffee", "mark": "done"}},
+        {"change": {"op": "markStep", "run": "b", "step": "coffee", "mark": "done"}, "ok": {"undo": {"mark": "done"}}}
+      ],
+      "expected": {"runs": {"b": {"done": {"coffee": "done"}}}}
+    },
+    {
+      "name": "marking a step the run does not have is refused",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "m", "routine": "morning", "flags": {"gym": false}}},
+        {"change": {"op": "markStep", "run": "m", "step": "gym", "mark": "done"}, "rejected": {"reason": "notFound", "kind": "step", "id": "gym"}}
+      ]
+    },
+    {
+      "name": "a run placed after a step waits on it, across runs",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "m", "routine": "morning", "flags": {"gym": false}}},
+        {"change": {"op": "startRun", "run": "b", "routine": "breakfast", "place": {"rel": "after", "run": "m", "step": "wake"}}}
+      ],
+      "expected": {"runs": {"b": {"attach": {"rel": "after", "run": "m", "id": "wake"}}}},
+      "today": {
+        "doNow": [{"run": "m", "step": "wake"}],
+        "running": [{"run": "m", "placed": null}, {"run": "b", "placed": {"rel": "after", "run": "m", "id": "wake"}}]
+      }
+    },
+    {
+      "name": "placing a run before a step holds that step back",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "m", "routine": "morning", "flags": {"gym": false}}},
+        {"change": {"op": "pullItem", "item": "x"}, "rejected": {"reason": "notFound", "kind": "item"}},
+        {"change": {"op": "addItem", "item": "call", "title": "Call the dentist"}},
+        {"change": {"op": "pullItem", "item": "call", "run": "t", "place": {"rel": "before", "run": "m", "step": "wake"}}}
+      ],
+      "today": {
+        "doNow": [{"run": "t", "runName": "Call the dentist", "step": "task", "from": null}],
+        "comingUp": [{"run": "m", "step": "wake", "after": null, "afterOther": [{"run": "t", "id": "task"}]}, {}, {}, {}, {}, {}, {}, {}, {}, {}]
+      }
+    },
+    {
+      "name": "placing that would make runs wait on each other in a loop is refused; moving a placement replaces it",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "a", "routine": "breakfast"}},
+        {"change": {"op": "startRun", "run": "b", "routine": "breakfast", "place": {"rel": "after", "run": "a", "step": "clean"}}},
+        {"change": {"op": "placeRun", "run": "a", "place": {"rel": "after", "run": "b", "step": "clean"}}, "rejected": {"reason": "placementLoop"}},
+        {"change": {"op": "startRun", "run": "c", "routine": "breakfast", "place": {"rel": "before", "run": "a", "step": "coffee"}}},
+        {"change": {"op": "placeRun", "run": "a", "place": {"rel": "before", "run": "c", "step": "coffee"}}, "rejected": {"reason": "placementLoop"}},
+        {"change": {"op": "placeRun", "run": "c", "place": {"rel": "after", "run": "b", "step": "eat"}}, "ok": {"undo": {"place": {"rel": "before", "run": "a", "step": "coffee"}}}}
+      ],
+      "expected": {"runs": {"a": {"attach": null}, "c": {"attach": {"rel": "after", "run": "b", "id": "eat"}}}}
+    },
+    {
+      "name": "a start whose placement would loop is refused whole: no run is left behind",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "a", "routine": "breakfast"}},
+        {"change": {"op": "startRun", "run": "b", "routine": "breakfast", "place": {"rel": "after", "run": "a", "step": "clean"}}},
+        {"change": {"op": "pullItem", "item": "nope"}, "rejected": {"reason": "notFound"}},
+        {"change": {"op": "startRun", "run": "c", "routine": "breakfast", "place": {"rel": "after", "run": "c", "step": "clean"}}, "rejected": {"reason": "placedOnItself"}},
+        {"change": {"op": "startRun", "run": "c", "routine": "breakfast", "place": {"rel": "after", "run": "a", "step": "nope"}}, "rejected": {"reason": "notFound", "kind": "step"}}
+      ],
+      "expected": {"runs": {"c": null}}
+    },
+    {
+      "name": "unplacing frees a run, and undo puts it back",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "a", "routine": "breakfast"}},
+        {"change": {"op": "startRun", "run": "b", "routine": "breakfast", "place": {"rel": "after", "run": "a", "step": "clean"}}},
+        {"change": {"op": "placeRun", "run": "b", "place": null}, "ok": {"undo": {"op": "placeRun", "run": "b", "place": {"rel": "after", "run": "a", "step": "clean"}}}}
+      ],
+      "expected": {"runs": {"b": {"attach": null}}},
+      "today": {"doNow": [{"step": "coffee"}, {"step": "food"}, {"run": "b", "step": "coffee"}, {"run": "b", "step": "food"}]}
+    },
+    {
+      "name": "abandoning keeps the run, marked removed, and what was placed after it goes ahead",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "a", "routine": "breakfast"}},
+        {"change": {"op": "startRun", "run": "b", "routine": "travel", "place": {"rel": "after", "run": "a", "step": "clean"}}},
+        {"change": {"op": "abandonRun", "run": "a"}, "ok": {"undo": {"op": "restoreRun", "run": "a"}}}
+      ],
+      "expected": {"runs": {"a": {"removed": {"at": 3000, "by": "dev"}}, "b": {"attach": {"run": "a"}}}},
+      "today": {
+        "doNow": [{"run": "b", "step": "clothes"}, {"run": "b", "step": "charger"}],
+        "running": [{"run": "b", "placed": null}]
+      }
+    },
+    {
+      "name": "an abandoned run cannot be ticked until it is restored",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "a", "routine": "breakfast"}},
+        {"change": {"op": "abandonRun", "run": "a"}},
+        {"change": {"op": "markStep", "run": "a", "step": "coffee", "mark": "done"}, "rejected": {"reason": "removed", "kind": "run", "id": "a"}},
+        {"change": {"op": "restoreRun", "run": "a"}},
+        {"change": {"op": "markStep", "run": "a", "step": "coffee", "mark": "done"}}
+      ],
+      "expected": {"runs": {"a": {"removed": null, "done": {"coffee": "done"}}}}
+    },
+    {
+      "name": "editing the routine never changes a run already started",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "b", "routine": "breakfast"}},
+        {"change": {"op": "setStepTitle", "routine": "breakfast", "step": "coffee", "title": "Make tea"}},
+        {"change": {"op": "renameRoutine", "routine": "breakfast", "name": "Brunch"}},
+        {"change": {"op": "removeStep", "routine": "breakfast", "step": "clean"}}
+      ],
+      "expected": {"runs": {"b": {"name": "Breakfast", "nodes": [{"title": "Start the coffee"}, {}, {}, {"id": "clean"}]}}}
+    },
+    {
+      "name": "a run cannot start from a deleted routine",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "deleteRoutine", "routine": "travel"}},
+        {"change": {"op": "startRun", "routine": "travel"}, "rejected": {"reason": "removed", "kind": "routine"}}
+      ]
+    },
+    {
+      "name": "steps sent with a start are used as they are, if they fit together",
+      "start": "seed",
+      "steps": [
+        {"change": {"op": "startRun", "run": "x", "routine": "breakfast", "nodes": [
+          {"id": "a", "title": "A", "deps": [], "source": "Breakfast"},
+          {"id": "b", "title": "B", "deps": ["a"], "source": "Breakfast"}
+        ]}},
+        {"change": {"op": "startRun", "run": "y", "routine": "breakfast", "nodes": [
+          {"id": "b", "title": "B", "deps": ["a"], "source": "Breakfast"},
+          {"id": "a", "title": "A", "deps": ["b"], "source": "Breakfast"}
+        ]}, "rejected": {"reason": "invalidSnapshot"}},
+        {"change": {"op": "startRun", "run": "y", "routine": "breakfast", "nodes": []}, "rejected": {"reason": "invalidSnapshot"}}
+      ],
+      "expected": {"runs": {"x": {"nodes": [{"id": "a"}, {"id": "b"}]}}}
+    }
+  ]
+}
