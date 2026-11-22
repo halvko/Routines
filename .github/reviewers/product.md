@@ -3,7 +3,8 @@ model: opus
 ---
 
 Judge whether the change fits the product as `docs/design.md` describes it,
-not whether the code works. Read that file first.
+and the technical decisions in `docs/decisions/`, not whether the code
+works. Read both first.
 
 - State in one or two sentences what the change lets the user do or changes
   about how the app behaves, as the user would put it. If you cannot, or it
@@ -20,4 +21,6 @@ not whether the code works. Read that file first.
   that works for routines but not for to-dos, or for one gesture but not
   the others; a second way to do something the app already does.
 - If the change moves the roadmap in `docs/design.md` (builds a slice,
-  changes a decision), the doc should say so in the same PR.
+  changes a decision), the doc should say so in the same PR. Code that goes
+  against a record in `docs/decisions/` needs a new record superseding it,
+  in the same PR.
