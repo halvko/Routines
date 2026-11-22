@@ -8,8 +8,7 @@ the rewrite will follow.
 
 **The JavaScript app is frozen to bug fixes** until the rewrite replaces it,
 so features are not built twice. New product work goes into the issues for
-the rewrite. The one planned exception is the last release's "move to the
-new app" step (`docs/decisions/0005`).
+the rewrite.
 
 ## After making changes
 

@@ -10,7 +10,9 @@ Research behind them lives in `docs/research/`.
 pre-1.0 technology is fine wherever failing means rework (an API changes, a
 feature is missing). It is not fine where failing could lose the owner's
 data: routines, runs and the backlog are their source of truth, so storage
-must have backups and an export path, whatever else we try.
+must have backups and an export path, whatever else we try. The one exception
+is the move from the current JavaScript app to the new one, where losing the
+old app's data is accepted.
 
 | # | Decision | Status |
 |---|---|---|

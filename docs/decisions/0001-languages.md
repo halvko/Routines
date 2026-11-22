@@ -11,9 +11,10 @@ Accepted, 2026-11-06.
   changes with exactly the rules the app uses.
 - **Web app:** React with TypeScript. It calls the core compiled to
   WebAssembly, and owns rendering, gestures, animation, storage and network.
-- **A future native app** links the same crate (directly, or through Crux if
-  that is worth it by then). Crux is not adopted now: it is pre-1.0 and only
-  pays off once there is a native shell.
+- **A future native app** links the same crate: directly from a Rust UI
+  (GPUI, Zed's framework, is a candidate; check its mobile support when the
+  time comes), or through Crux behind SwiftUI or Compose. Neither is adopted
+  now: Crux is pre-1.0 and only pays off once there is a native shell.
 
 ## Why
 
